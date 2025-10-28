@@ -36,6 +36,30 @@ const AIRTABLE_BASE = process.env.AIRTABLE_BASE || '';
 const AIRTABLE_TABLE = process.env.AIRTABLE_TABLE || 'Orders';
 const BASE_URL = process.env.BASE_URL || 'https://payconnect-moolre-backend.onrender.com';
 
+// --- NEW HELPER: AIRTABLE READ RECORD (For Idempotency Check) ---
+async function airtableRead(externalRef) {
+  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE) {
+    console.error('Airtable environment variables missing for read.');
+    return null;
+  }
+  
+  // Construct the URL with a filter formula to search for the unique Order ID
+  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE}/${encodeURIComponent(AIRTABLE_TABLE)}?filterByFormula=({Order ID}='${externalRef}')`;
+
+  try {
+    const res = await axios.get(url, {
+      headers: {
+        Authorization: `Bearer ${AIRTABLE_API_KEY}`,
+      }
+    });
+    // Return the array of records found
+    return res.data.records;
+  } catch (err) {
+    console.error('Airtable Read API error:', err.response?.data || err.message);
+    return null;
+  }
+}
+
 // ====== AIRTABLE CREATE RECORD ======
 async function airtableCreate(fields) {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE) {
@@ -87,12 +111,14 @@ async function sendHubtelSMS(to, message) {
   }
 }
 
-// ====== START CHECKOUT ======
+// ====== START CHECKOUT (Restored 'delivery' field in metadata) ======
 app.post('/api/start-checkout', async (req, res) => {
   try {
-    const { email, phone, recipient, dataPlan, amount } = req.body;
+    // Ensure 'delivery' is included here
+    const { email, phone, recipient, dataPlan, amount, delivery } = req.body; 
 
-    if (!phone || !recipient || !dataPlan || !amount) {
+    // Ensure 'delivery' is validated (if not in required fields before, let's assume it is now)
+    if (!phone || !recipient || !dataPlan || !amount || !delivery) { 
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -117,7 +143,8 @@ app.post('/api/start-checkout', async (req, res) => {
       reusable: false,
       externalref: orderId,
       callback: `${BASE_URL}/api/webhook/moolre`,
-      metadata: { customer_id: phone, dataPlan, recipient }
+      // Pass the delivery option to the Moolre metadata
+      metadata: { customer_id: phone, dataPlan, recipient, delivery } 
     };
 
     const response = await axios.post(`${MOOLRE_BASE}/embed/link`, payload, { headers });
@@ -136,7 +163,7 @@ app.post('/api/start-checkout', async (req, res) => {
   }
 });
 
-// ====== MOOLRE WEBHOOK ======
+// ====== MOOLRE WEBHOOK (MODIFIED WITH IDEMPOTENCY CHECK) ======
 app.post('/api/webhook/moolre', async (req, res) => {
   let smsResult = { success: false, error: 'SMS not sent' };
 
@@ -151,23 +178,41 @@ app.post('/api/webhook/moolre', async (req, res) => {
     }
 
     const txstatus = Number(data.txstatus || 0);
-    const externalref = data.externalref || '';
+    const externalref = data.externalref || ''; // Unique Order ID
     const payerFromMoolre = data.payer || '';
     const metadataPhone = data.metadata?.customer_id || '';
     const customerPhoneRaw = extractNumberFromPayer(payerFromMoolre, metadataPhone);
     const customerPhone = cleanPhoneNumber(customerPhoneRaw);
-
+    
     const amount = data.amount || '';
     const dataPlan = data.metadata?.dataPlan || '';
     const recipient = data.metadata?.recipient || '';
+    // Restore delivery option extraction
+    const deliveryOption = data.metadata?.delivery || 'Normal'; 
 
     if (txstatus === 1) {
-      // ✅ Payment successful - send SMS
-      const smsText = `Your data purchase of ${dataPlan} for ${recipient} has been processed and will be delivered in 30 minutes to 4 hours. Order ID: ${externalref}. For support, WhatsApp: 233531300654;`
+      
+      // --- 🚨 IDEMPOTENCY CHECK ---
+      const existingRecords = await airtableRead(externalref);
+      if (existingRecords && existingRecords.length > 0) {
+          console.warn(`Duplicate webhook received. Record for Order ID ${externalref} already exists. Skipping.`);
+          // Acknowledge receipt with 200 OK to stop Moolre from retrying.
+          return res.json({ success: true, message: 'Transaction already processed.' });
+      }
+      // --- END IDEMPOTENCY CHECK ---
+
+      // ✅ Payment successful - DETERMINE SMS TEXT (using delivery option)
+      let smsText;
+      if (deliveryOption.toLowerCase() === 'express') {
+        smsText = `Your data purchase of ${dataPlan} for ${recipient} has been processed and will be delivered in 5-30 minutes. Order ID: ${externalref}. For support, WhatsApp: 233531300654;`
+      } else {
+        // Normal Delivery or any other unrecognised option
+        smsText = `Your data purchase of ${dataPlan} for ${recipient} has been processed and will be delivered in 30 minutes to 4 hours. Order ID: ${externalref}. For support, WhatsApp: 233531300654;`
+      }
 
       smsResult = await sendHubtelSMS(customerPhone, smsText);
 
-      // ✅ Create Airtable record
+      // ✅ Create Airtable record (Only executes if no duplicate was found)
       const fields = {
         "Order ID": externalref,
         "Customer Phone": customerPhone,
@@ -175,20 +220,24 @@ app.post('/api/webhook/moolre', async (req, res) => {
         "Data Plan": dataPlan,
         "Amount": Number(amount),
         "Status": "Pending",
+        "Delivery Option": deliveryOption, // Include for logging/tracking
         "Hubtel Sent": smsResult.success,
         "Hubtel Response": JSON.stringify(smsResult.data || smsResult.error || {})
       };
 
       await airtableCreate(fields);
       console.log(`✅ Airtable Record created for Order ID: ${externalref}`);
+      // Return 200 OK after successful processing
       return res.json({ success: true, message: 'SMS sent and Airtable record created' });
     }
 
-    console.log(`Payment not successful (Status: ${txstatus})`);
+    console.log(`Payment not successful (Status: ${txstatus}). No action taken.`);
+    // Return 200 OK for non-successful events to clear the webhook queue
     return res.json({ success: true, message: 'Payment not successful' });
   } catch (err) {
     console.error('webhook handler error:', err.message);
-    return res.status(500).json({ error: 'webhook internal error', details: err.message });
+    // Return 200 OK even on internal error to prevent excessive retries
+    return res.status(200).json({ success: false, message: 'Internal processing error.' });
   }
 });
 
