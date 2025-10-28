@@ -136,10 +136,8 @@ app.post('/api/start-checkout', async (req, res) => {
   }
 });
 
-// ====== MOOLRE WEBHOOK ======
+// ====== MOOLRE WEBHOOK (DEDUPED) ======
 app.post('/api/webhook/moolre', async (req, res) => {
-  let smsResult = { success: false, error: 'SMS not sent' };
-
   try {
     const payload = req.body || {};
     const data = payload.data || {};
@@ -162,10 +160,20 @@ app.post('/api/webhook/moolre', async (req, res) => {
     const recipient = data.metadata?.recipient || '';
 
     if (txstatus === 1) {
+      // ====== CHECK FOR EXISTING RECORD ======
+      const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE}/${encodeURIComponent(AIRTABLE_TABLE)}?filterByFormula=({Order ID}='${externalref}')`;
+      const existing = await axios.get(airtableUrl, {
+        headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
+      });
+
+      if (existing.data.records && existing.data.records.length > 0) {
+        console.log(`Duplicate webhook detected for Order ID: ${externalref}. Skipping SMS & Airtable.`);
+        return res.status(200).json({ success: true, message: 'Duplicate webhook detected. No action taken.' });
+      }
+
       // ✅ Payment successful - send SMS
       const smsText = `Your data purchase of ${dataPlan} for ${recipient} has been processed and will be delivered in 30 minutes to 4 hours. Order ID: ${externalref}. For support, WhatsApp: 233531300654`;
-
-      smsResult = await sendHubtelSMS(customerPhone, smsText);
+      const smsResult = await sendHubtelSMS(customerPhone, smsText);
 
       // ✅ Create Airtable record
       const fields = {
@@ -181,11 +189,12 @@ app.post('/api/webhook/moolre', async (req, res) => {
 
       await airtableCreate(fields);
       console.log(`✅ Airtable Record created for Order ID: ${externalref}`);
-      return res.json({ success: true, message: 'SMS sent and Airtable record created' });
+      return res.status(200).json({ success: true, message: 'SMS sent and Airtable record created' });
     }
 
     console.log(`Payment not successful (Status: ${txstatus})`);
-    return res.json({ success: true, message: 'Payment not successful' });
+    return res.status(200).json({ success: true, message: 'Payment not successful' });
+
   } catch (err) {
     console.error('webhook handler error:', err.message);
     return res.status(500).json({ error: 'webhook internal error', details: err.message });
