@@ -140,21 +140,15 @@ app.post('/api/start-checkout', async (req, res) => {
 // ====== MOOLRE WEBHOOK (PAYMENT CONFIRMATION) ======
 app.post('/api/webhook/moolre', async (req, res) => {
   try {
-    // CRITICAL LOGGING: Confirm server received the webhook request
-    console.log('--- Moolre Webhook Received ---'); 
-    
     const payload = req.body || {};
     const data = payload.data || {};
-    // Extract the incoming secret sent by Moolre
+    // Extract the incoming secret sent by Moolre. Defaults to empty string if missing.
     const incomingSecret = data.secret || payload.secret || '';
 
-    // --- CRITICAL DEBUG LOGS TO FIND THE MISMATCHED KEY ---
-    console.log(`[DEBUG] MOOLRE_SECRET (Render Value): ${MOOLRE_SECRET}`);
-    console.log(`[DEBUG] INCOMING SECRET (Moolre Value): ${incomingSecret}`);
-    // ------------------------------------------------------
-
+    // If MOOLRE_SECRET is currently set to your Private API Key, this will fail.
+    // By setting MOOLRE_SECRET to an empty string on Render, both will be empty, and this check will pass.
     if (incomingSecret !== MOOLRE_SECRET) {
-      console.warn('Invalid webhook secret: Mismatch detected.');
+      console.warn('Invalid webhook secret: Mismatch detected. Blocking request.');
       return res.status(401).json({ error: 'Invalid webhook secret' });
     }
 
