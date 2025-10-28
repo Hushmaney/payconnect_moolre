@@ -119,7 +119,7 @@ app.post('/api/start-checkout', async (req, res) => {
       externalref: orderId,
       callback: `${BASE_URL}/api/webhook/moolre`,
       metadata: {
-        customer_id: phone,
+        customer_id: phone, // <-- Customer's phone is correctly saved here
         dataPlan,
         recipient
       }
@@ -160,7 +160,13 @@ app.post('/api/webhook/moolre', async (req, res) => {
 
     const txstatus = Number(data.txstatus || 0);
     const externalref = data.externalref || '';
-    const payer = data.payer || '';
+    
+    // Original payer field from Moolre (which is coming back empty)
+    const payerFromMoolre = data.payer || ''; 
+    
+    // CRITICAL FIX: Get customer phone number from 'payer' or FALLBACK to 'metadata.customer_id'
+    const customerPhone = payerFromMoolre || data.metadata?.customer_id || ''; 
+    
     const amount = data.amount || '';
     const dataPlan = data.metadata?.dataPlan || '';
     const recipient = data.metadata?.recipient || '';
@@ -171,8 +177,8 @@ app.post('/api/webhook/moolre', async (req, res) => {
       // 1. Send confirmation SMS
       try {
         const smsText = `Your data purchase of ${dataPlan} for ${recipient} has been processed and will be delivered in 30 minutes to 4 hours. Order ID: ${externalref}. For support, WhatsApp: 233531300654`;
-        // FIX: Send SMS ONLY to the payer (Customer Phone)
-        smsResult = await sendHubtelSMS(payer, smsText); 
+        // Use the reliably retrieved customerPhone
+        smsResult = await sendHubtelSMS(customerPhone, smsText); 
       } catch (smsError) {
         console.error('Failed to send Hubtel SMS, proceeding with Airtable log:', smsError.message);
         smsResult.error = `Failed to send SMS: ${smsError.message}`;
@@ -185,7 +191,7 @@ app.post('/api/webhook/moolre', async (req, res) => {
       // 2. CREATE AIRTABLE RECORD HERE
       const fields = {
         "Order ID": externalref,
-        "Customer Phone": payer,
+        "Customer Phone": customerPhone, // Use the reliably retrieved customerPhone
         "Data Recipient Number": recipient,
         "Data Plan": dataPlan,
         "Amount": Number(amount),
