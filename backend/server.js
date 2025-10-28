@@ -56,7 +56,15 @@ async function airtableCreate(fields) {
 // ====== HUBTEL SMS ======
 async function sendHubtelSMS(to, message) {
   try {
+    // This creates the Base64 encoded string of CLIENT_ID:CLIENT_SECRET
     const token = Buffer.from(`${HUBTEL_CLIENT_ID}:${HUBTEL_CLIENT_SECRET}`).toString('base64');
+    
+    // Check if the keys are actually present before sending
+    if (!HUBTEL_CLIENT_ID || !HUBTEL_CLIENT_SECRET) {
+        console.error('Hubtel keys are missing, skipping SMS send.');
+        return { success: false, error: 'Configuration missing' };
+    }
+
     const payload = {
       From: HUBTEL_SENDER,
       To: to,
@@ -64,12 +72,14 @@ async function sendHubtelSMS(to, message) {
       ClientId: HUBTEL_CLIENT_ID
     };
 
+    // The Authorization header must be 'Basic ' followed by the Base64 token
     const res = await axios.post('https://api.hubtel.com/v1/messages', payload, {
       headers: { Authorization: `Basic ${token}`, 'Content-Type': 'application/json' }
     });
 
     return { success: true, data: res.data };
   } catch (err) {
+    // Log detailed error from Hubtel
     console.error('Hubtel send error', err.response?.data || err.message);
     return { success: false, error: err.response?.data || err.message };
   }
@@ -139,14 +149,14 @@ app.post('/api/start-checkout', async (req, res) => {
 
 // ====== MOOLRE WEBHOOK (PAYMENT CONFIRMATION) ======
 app.post('/api/webhook/moolre', async (req, res) => {
+  let smsResult = { success: false, error: 'SMS not attempted' };
   try {
     const payload = req.body || {};
     const data = payload.data || {};
     // Extract the incoming secret sent by Moolre. Defaults to empty string if missing.
     const incomingSecret = data.secret || payload.secret || '';
 
-    // If MOOLRE_SECRET is currently set to your Private API Key, this will fail.
-    // By setting MOOLRE_SECRET to an empty string on Render, both will be empty, and this check will pass.
+    // Webhook secret validation check
     if (incomingSecret !== MOOLRE_SECRET) {
       console.warn('Invalid webhook secret: Mismatch detected. Blocking request.');
       return res.status(401).json({ error: 'Invalid webhook secret' });
@@ -160,23 +170,29 @@ app.post('/api/webhook/moolre', async (req, res) => {
     const recipient = data.metadata?.recipient || '';
 
     if (txstatus === 1) {
-      // ✅ Payment successful - CREATE AIRTABLE RECORD HERE
+      // ✅ Payment successful 
       
-      // Send a confirmation SMS (to the payer or recipient, depending on your preference)
-      const smsText = `Payment received for ${dataPlan || 'your order'} (${amount} GHS). Your data will be delivered shortly. Order ID: ${externalref}. For support: WhatsApp 0531300654`;
-
-      // For this step, we will use the payer's number as the primary notification target
-      const smsResult = await sendHubtelSMS(payer || recipient, smsText); 
+      // 1. Send confirmation SMS with customized message
+      try {
+        // Updated SMS message with the custom details you requested
+        const smsText = `Your data purchase of ${dataPlan} for ${recipient} has been processed and will be delivered in 30 minutes to 4 hours. Order ID: ${externalref}. For support, WhatsApp: 233531300654`;
+        smsResult = await sendHubtelSMS(payer || recipient, smsText); 
+      } catch (smsError) {
+        console.error('Failed to send Hubtel SMS, proceeding with Airtable log:', smsError.message);
+        smsResult.error = `Failed to send SMS: ${smsError.message}`;
+      }
+      
       const hubtelSent = smsResult.success ? 'Yes' : 'No';
       const hubtelResponse = JSON.stringify(smsResult.data || smsResult.error || {});
 
+      // 2. CREATE AIRTABLE RECORD HERE
       const fields = {
         "Order ID": externalref,
         "Customer Phone": payer,
         "Data Recipient Number": recipient,
         "Data Plan": dataPlan,
         "Amount": Number(amount),
-        // CRITICAL: Set initial status to 'Pending' for manual fulfillment
+        // This is correctly set to 'Pending' as requested for manual fulfillment
         "Status": "Pending", 
         "Hubtel Sent": hubtelSent,
         "Hubtel Response": hubtelResponse
@@ -184,13 +200,14 @@ app.post('/api/webhook/moolre', async (req, res) => {
 
       await airtableCreate(fields);
       console.log(`✅ Airtable Record created for Order ID: ${externalref}`);
-      return res.json({ success: true, message: 'Airtable record created and SMS sent' });
+      return res.json({ success: true, message: 'Airtable record created and SMS attempted' });
     }
 
     // Handle failed or cancelled transactions if necessary
     console.log(`Payment not successful (Status: ${txstatus}). No Airtable record created.`);
     return res.json({ success: true, message: 'Payment not successful' });
   } catch (err) {
+    // This catches errors from the airtableCreate call or other synchronous errors
     console.error('webhook handler internal error:', err.message);
     return res.status(500).json({ error: 'webhook handler internal error', details: err.message });
   }
