@@ -12,7 +12,7 @@ app.use(bodyParser.json());
 const PORT = process.env.PORT || 3000;
 const MOOLRE_BASE = process.env.MOOLRE_BASE || 'https://api.moolre.com';
 const MOOLRE_PUBLIC_API_KEY = process.env.MOOLRE_PUBLIC_API_KEY || '';
-const MOOLRE_USERNAME = process.env.MOOLRE_USERNAME || '';
+const MOOLRE_USERNAME = process.env.MOOLRE_USERNAME || ''; // ✅ Corrected spelling
 const MOOLRE_SECRET = process.env.MOOLRE_SECRET || '';
 
 const HUBTEL_CLIENT_ID = process.env.HUBTEL_CLIENT_ID || '';
@@ -79,16 +79,26 @@ app.post('/api/start-checkout', async (req, res) => {
       type: 1,
       amount: Number(amount),
       currency: 'GHS',
+      username: MOOLRE_USERNAME, // ✅ Include username in payload
       email: email || 'noemail@payconnect.com',
       reusable: false,
       externalref: orderId,
       callback: `${BASE_URL}/api/webhook/moolre`,
-      metadata: { customer_id: phone }
+      metadata: {
+        customer_id: phone,
+        dataPlan,
+        recipient
+      }
     };
 
     const response = await axios.post(`${MOOLRE_BASE}/embed/link`, payload, { headers });
     const moolreData = response.data;
     const paymentLink = moolreData.data?.payment_link || moolreData.data?.redirect_url;
+
+    if (!paymentLink) {
+      console.error('Moolre response missing payment link:', moolreData);
+      return res.status(400).json({ error: 'No payment link received', details: moolreData });
+    }
 
     return res.json({ success: true, orderId, paymentLink, moolreData });
   } catch (err) {
@@ -119,16 +129,14 @@ app.post('/api/webhook/moolre', async (req, res) => {
     const dataPlan = data.metadata?.dataPlan || '';
     const recipient = data.metadata?.recipient || '';
 
-    // Only act if payment is successful
     if (txstatus === 1) {
-      // Step 1: Send SMS
+      // ✅ Payment successful
       const smsText = `Payment received for ${dataPlan || 'your order'} (${amount} GHS). Your data will be delivered shortly. Order ID: ${externalref}. For support: WhatsApp 0531300654`;
 
       const smsResult = await sendHubtelSMS(payer || recipient, smsText);
       const hubtelSent = smsResult.success ? 'Yes' : 'No';
       const hubtelResponse = JSON.stringify(smsResult.data || smsResult.error || {});
 
-      // Step 2: Create Airtable record
       const fields = {
         "Order ID": externalref,
         "Customer Phone": payer,
@@ -144,7 +152,6 @@ app.post('/api/webhook/moolre', async (req, res) => {
       return res.json({ success: true, message: 'Airtable record created and SMS sent' });
     }
 
-    // Ignore failed or pending payments
     return res.json({ success: true, message: 'Payment not successful' });
   } catch (err) {
     console.error('webhook handler error', err.response?.data || err.message);

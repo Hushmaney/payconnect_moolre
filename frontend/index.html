@@ -64,37 +64,21 @@
       font-size:15px;
       outline:none;
     }
-    input[readonly]{
-      background:#f3f4f6;
-      color:#111827;
-    }
-    .muted{
-      color:var(--muted);
-      font-size:13px;
-      text-align:center;
-      margin-top:6px;
-      grid-column:1 / -1;
-    }
+    input[readonly]{background:#f3f4f6;color:#111827;}
+    .muted{color:var(--muted);font-size:13px;text-align:center;margin-top:6px;grid-column:1 / -1;}
     .actions{grid-column:1 / -1; display:flex; gap:12px; margin-top:6px;}
     button{
       flex:1;
       padding:12px 14px;
       border-radius:9px;
-      border: none;
+      border:none;
       font-weight:700;
       font-size:15px;
       cursor:pointer;
     }
-    .btn-pay{
-      background:var(--accent);
-      color:white;
-    }
+    .btn-pay{background:var(--accent);color:white;}
     .btn-pay[disabled]{opacity:0.6;cursor:not-allowed}
-    .btn-clear{
-      background:transparent;
-      border:1px solid #e6e9ef;
-      color:#111827;
-    }
+    .btn-clear{background:transparent;border:1px solid #e6e9ef;color:#111827;}
     #message{grid-column:1 / -1; margin-top:14px}
     .msg{
       padding:12px;
@@ -102,15 +86,15 @@
       font-weight:600;
       text-align:center;
     }
-    .msg.success{background:#ecfdf5;color:var(--success); border:1px solid #bbf0d0}
-    .msg.error{background:#fff1f2;color:var(--danger); border:1px solid #f7c2c6}
+    .msg.success{background:#ecfdf5;color:var(--success);border:1px solid #bbf0d0}
+    .msg.error{background:#fff1f2;color:var(--danger);border:1px solid #f7c2c6}
     .msg.info{background:#eff6ff;color:#1e3a8a;border:1px solid #dbeafe}
     @media (max-width:640px){
-      form{grid-template-columns:1fr; gap:10px}
+      form{grid-template-columns:1fr;gap:10px}
       .actions{flex-direction:column}
     }
-    input:focus, select:focus{box-shadow:0 4px 12px rgba(11,116,255,0.08); border-color:var(--accent)}
-    .small{font-size:13px; color:var(--muted)}
+    input:focus,select:focus{box-shadow:0 4px 12px rgba(11,116,255,0.08);border-color:var(--accent)}
+    .small{font-size:13px;color:var(--muted)}
   </style>
 </head>
 <body>
@@ -163,7 +147,10 @@
         <input id="amount" type="text" readonly placeholder="0.00" />
       </div>
 
-      <div class="muted full small">After clicking <strong>Pay</strong>, you'll be redirected to a secure Moorle payment page. Then you'll receive an SMS once payment is confirmed.</div>
+      <div class="muted full small">
+        After clicking <strong>Pay</strong>, you'll be redirected to a secure Moolre payment page.
+        Once payment is confirmed, you'll receive an SMS and your order will appear as Pending on our dashboard.
+      </div>
 
       <div class="actions full">
         <button type="button" class="btn-clear" id="clearBtn">Clear</button>
@@ -188,44 +175,20 @@
         ["8GB", 40.00, 42.00],
         ["10GB", 50.00, 52.00],
         ["15GB", 72.00, 74.00],
-        ["20GB", 87.00, 89.00],
-        ["25GB", 110.00, 112.00],
-        ["30GB", 135.00, 137.00],
-        ["40GB", 175.00, 177.00],
-        ["50GB", 210.00, 212.00],
-        ["100GB", 405.00, 407.00]
+        ["20GB", 87.00, 89.00]
       ],
       TELECEL: [
         ["5GB", 24.00, 27.00],
         ["10GB", 44.00, 47.00],
         ["15GB", 63.00, 65.00],
-        ["20GB", 83.00, 85.00],
-        ["25GB", 101.00, 103.00],
-        ["30GB", 121.00, 122.00],
-        ["35GB", 150.00, 152.00],
-        ["40GB", 161.00, 163.00],
-        ["45GB", 190.00, 192.00],
-        ["50GB", 202.00, 204.00],
-        ["100GB", 375.00, 377.00]
+        ["20GB", 83.00, 85.00]
       ],
       AIRTELTIGO: [
         ["1GB", 4.50, 5.00],
         ["2GB", 8.50, 9.50],
         ["3GB", 13.00, 14.00],
         ["4GB", 17.00, 18.00],
-        ["5GB", 23.00, 24.00],
-        ["6GB", 28.00, 29.00],
-        ["7GB", 32.00, 33.00],
-        ["8GB", 41.00, 42.00],
-        ["10GB", 47.00, 48.00],
-        ["12GB", 55.00, 56.00],
-        ["15GB", 72.00, 73.00],
-        ["20GB", 82.00, 83.00],
-        ["25GB", 98.00, 99.00],
-        ["30GB", 128.00, 129.00],
-        ["40GB", 175.00, 176.00],
-        ["50GB", 230.00, 231.00],
-        ["100GB", 440.00, 441.00]
+        ["5GB", 23.00, 24.00]
       ]
     };
 
@@ -251,25 +214,20 @@
       planSel.innerHTML = '';
       amountInput.value = '';
       if(!network || !PLANS[network]){
-        const opt = document.createElement('option');
-        opt.value = '';
-        opt.textContent = 'Select a network first';
-        planSel.appendChild(opt);
+        planSel.innerHTML = '<option value="">Select a network first</option>';
         planSel.disabled = true;
         return;
       }
       planSel.disabled = false;
-      const headerOpt = document.createElement('option');
-      headerOpt.value = '';
-      headerOpt.textContent = 'Select Data Plan';
-      planSel.appendChild(headerOpt);
+      let opt = document.createElement('option');
+      opt.value = ''; opt.textContent = 'Select Data Plan';
+      planSel.appendChild(opt);
 
       PLANS[network].forEach(plan=>{
-        const [name, normalPrice, expressPrice] = plan;
+        const [name, normal, express] = plan;
         const option = document.createElement('option');
-        const payload = { name: `${network} ${name}`, normalPrice: Number(normalPrice), expressPrice: Number(expressPrice) };
-        option.value = JSON.stringify(payload);
-        option.textContent = `${name} — GHS ${formatPrice(normalPrice)} (Normal) / GHS ${formatPrice(expressPrice)} (Express)`;
+        option.value = JSON.stringify({name:`${network} ${name}`, normal, express});
+        option.textContent = `${name} — GHS ${formatPrice(normal)} / GHS ${formatPrice(express)} (Express)`;
         planSel.appendChild(option);
       });
     }
@@ -279,15 +237,12 @@
         const val = planSel.value;
         if(!val){ amountInput.value=''; return; }
         const parsed = JSON.parse(val);
-        const delivery = deliverySel.value;
-        const p = delivery === 'Express' ? parsed.expressPrice : parsed.normalPrice;
-        amountInput.value = formatPrice(p);
-      }catch(e){
-        amountInput.value = '';
-      }
+        const price = deliverySel.value === 'Express' ? parsed.express : parsed.normal;
+        amountInput.value = formatPrice(price);
+      }catch{ amountInput.value=''; }
     }
 
-    networkSel.addEventListener('change', (e)=>{ populatePlansForNetwork(e.target.value); clearMessage(); });
+    networkSel.addEventListener('change', e => { populatePlansForNetwork(e.target.value); clearMessage(); });
     planSel.addEventListener('change', ()=>{ updateAmountFromPlan(); clearMessage(); });
     deliverySel.addEventListener('change', ()=>{ updateAmountFromPlan(); clearMessage(); });
 
@@ -300,79 +255,48 @@
     });
 
     function genOrderId(){
-      const rand = Math.floor(Math.random()*900000000000000) + 100000000000000;
-      return 'T' + rand.toString();
+      return 'T' + (Math.floor(Math.random()*900000000000000)+100000000000000);
     }
 
-    document.getElementById('checkoutForm').addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      clearMessage();
-
+    document.getElementById('checkoutForm').addEventListener('submit', async e => {
+      e.preventDefault(); clearMessage();
       const email = document.getElementById('email').value.trim();
       const phone = document.getElementById('phone').value.trim();
       const recipient = document.getElementById('recipient').value.trim();
       const network = networkSel.value;
       const delivery = deliverySel.value;
-      const dataPlanValue = planSel.value;
-      const amount = amountInput.value;
+      const planVal = planSel.value;
+      if(!phone || !recipient || !network || !planVal) return showMessage('All fields are required.','error');
 
-      if(!phone) return showMessage('Customer phone is required.', 'error');
-      if(!recipient) return showMessage('Recipient number is required.', 'error');
-      if(!network) return showMessage('Please select a network.', 'error');
-      if(!dataPlanValue) return showMessage('Please select a data plan.', 'error');
-      if(!amount) return showMessage('Amount is missing. Choose a data plan.', 'error');
-
-      let parsedPlan;
-      try{ parsedPlan = JSON.parse(dataPlanValue); }catch(err){ return showMessage('Invalid data plan.', 'error'); }
-
+      const plan = JSON.parse(planVal);
+      const amount = delivery === 'Express' ? plan.express : plan.normal;
       const orderId = genOrderId();
 
-      const payload = {
-        email,
-        phone,
-        recipient,
-        network,
-        deliveryType: delivery,
-        dataPlan: parsedPlan.name,
-        amount: Number(delivery === 'Express' ? parsedPlan.expressPrice : parsedPlan.normalPrice),
-        orderId
-      };
+      const payload = { email, phone, recipient, network, deliveryType: delivery, dataPlan: plan.name, amount, orderId };
 
-      payBtn.disabled = true;
-      payBtn.textContent = 'Processing...';
+      payBtn.disabled = true; payBtn.textContent = 'Processing...';
       showMessage('Initiating payment...','info');
 
       try{
         const res = await fetch(BACKEND_URL + '/api/start-checkout', {
           method:'POST',
-          headers:{ 'Content-Type':'application/json' },
-          body: JSON.stringify(payload)
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify(payload)
         });
         const data = await res.json();
-        if(!res.ok) throw new Error(data.error || data.message || 'Failed to start payment');
+        if(!res.ok) throw new Error(data.error || 'Failed to start payment');
 
-        const paymentLink = data?.data?.paymentLink || data?.paymentLink || data?.data?.payment_link;
-        if(!paymentLink){
-          showMessage('Payment started but no redirect link received. Check server logs.', 'error');
-          console.warn('start-checkout response:', data);
-        } else {
-          showMessage('Redirecting to payment page...', 'info');
-          setTimeout(()=> window.location.href = paymentLink, 300);
-        }
+        const link = data?.data?.paymentLink || data?.paymentLink;
+        if(link){ showMessage('Redirecting to Moolre...','info'); setTimeout(()=>window.location.href=link,500);}
+        else showMessage('No payment link received.','error');
       }catch(err){
-        console.error(err);
-        showMessage('Error: ' + (err.message || 'Something went wrong'), 'error');
+        console.error(err); showMessage('Error: '+err.message,'error');
       }finally{
-        payBtn.disabled = false;
-        payBtn.textContent = 'Pay';
+        payBtn.disabled=false; payBtn.textContent='Pay';
       }
     });
 
-    (function init(){
-      planSel.innerHTML = '<option value="">Select a network first</option>';
-      planSel.disabled = true;
-      amountInput.value = '';
-    })();
+    (function init(){ planSel.innerHTML='<option value="">Select a network first</option>'; planSel.disabled=true; })();
   </script>
 </body>
 </html>
