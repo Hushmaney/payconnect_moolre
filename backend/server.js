@@ -1,4 +1,3 @@
-require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
@@ -39,6 +38,7 @@ const MOOLRE_USERNAME = process.env.MOOLRE_USERNAME || '';
 const MOOLRE_SECRET = process.env.MOOLRE_SECRET || '';
 const MOOLRE_ACCOUNT_NUMBER = process.env.MOOLRE_ACCOUNT_NUMBER || ''; 
 
+// These variables MUST be set correctly in the Render Dashboard
 const HUBTEL_CLIENT_ID = process.env.HUBTEL_CLIENT_ID || '';
 const HUBTEL_CLIENT_SECRET = process.env.HUBTEL_CLIENT_SECRET || '';
 const HUBTEL_SENDER = process.env.HUBTEL_SENDER || 'Pconnect';
@@ -80,6 +80,7 @@ async function sendHubtelSMS(to, message) {
     
     // Check if the keys are actually present before sending
     if (!HUBTEL_CLIENT_ID || !HUBTEL_CLIENT_SECRET) {
+        // This log is what we are trying to avoid hitting now
         console.error('Hubtel keys are missing, skipping SMS send.');
         return { success: false, error: 'Configuration missing' };
     }
