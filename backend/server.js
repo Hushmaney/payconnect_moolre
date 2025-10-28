@@ -84,13 +84,18 @@ async function sendHubtelSMS(to, message) {
         return { success: false, error: 'Configuration missing' };
     }
 
+    // --- DEBUGGING LOG (Temporary) ---
+    // This helps confirm the exact length of the keys being read by the server
+    console.log(`[HUBTEL DEBUG] Client ID Length: ${HUBTEL_CLIENT_ID.length}, Secret Length: ${HUBTEL_CLIENT_SECRET.length}`);
+    // --- END DEBUGGING LOG ---
+
     const token = Buffer.from(`${HUBTEL_CLIENT_ID}:${HUBTEL_CLIENT_SECRET}`).toString('base64');
 
     const payload = {
       From: HUBTEL_SENDER,
       // Use the cleaned number
       To: cleanedTo,
-      ClientId: HUBTEL_CLIENT_ID
+      // ClientId is omitted from the body payload as authentication is done via the header
     };
     
     // CRITICAL: Hubtel requires the message content
