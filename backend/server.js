@@ -9,11 +9,13 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // ====== ENVIRONMENT CONFIG ======
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000; 
 const MOOLRE_BASE = process.env.MOOLRE_BASE || 'https://api.moolre.com';
 const MOOLRE_PUBLIC_API_KEY = process.env.MOOLRE_PUBLIC_API_KEY || '';
-const MOOLRE_USERNAME = process.env.MOOLRE_USERNAME || ''; // ✅ Corrected spelling
+const MOOLRE_USERNAME = process.env.MOOLRE_USERNAME || ''; 
 const MOOLRE_SECRET = process.env.MOOLRE_SECRET || '';
+// NEW: Account number is required for the /embed/link payload
+const MOOLRE_ACCOUNT_NUMBER = process.env.MOOLRE_ACCOUNT_NUMBER || ''; 
 
 const HUBTEL_CLIENT_ID = process.env.HUBTEL_CLIENT_ID || '';
 const HUBTEL_CLIENT_SECRET = process.env.HUBTEL_CLIENT_SECRET || '';
@@ -67,19 +69,27 @@ app.post('/api/start-checkout', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    if (!MOOLRE_ACCOUNT_NUMBER || !MOOLRE_USERNAME || !MOOLRE_PUBLIC_API_KEY) {
+         console.error('Moolre environment variables missing.');
+         return res.status(500).json({ error: 'Server configuration error (Moolre keys missing)' });
+    }
+
     const orderId = 'T' + Math.floor(Math.random() * 900000000000000 + 100000000000000);
 
     // Request payment link from Moolre
     const headers = {
       'Content-Type': 'application/json',
-      'X-API-PUBKEY': MOOLRE_PUBLIC_API_KEY
+      // Required headers as per documentation for /embed/link
+      'X-API-PUBKEY': MOOLRE_PUBLIC_API_KEY,
+      'X-API-USER': MOOLRE_USERNAME 
     };
 
     const payload = {
       type: 1,
       amount: Number(amount),
       currency: 'GHS',
-      username: MOOLRE_USERNAME, // ✅ Include username in payload
+      // REQUIRED: Use accountnumber field for /embed/link endpoint
+      accountnumber: MOOLRE_ACCOUNT_NUMBER, 
       email: email || 'noemail@payconnect.com',
       reusable: false,
       externalref: orderId,
@@ -93,7 +103,8 @@ app.post('/api/start-checkout', async (req, res) => {
 
     const response = await axios.post(`${MOOLRE_BASE}/embed/link`, payload, { headers });
     const moolreData = response.data;
-    const paymentLink = moolreData.data?.payment_link || moolreData.data?.redirect_url;
+    // Use authorization_url as primary field as per Moolre docs
+    const paymentLink = moolreData.data?.authorization_url || moolreData.data?.redirect_url; 
 
     if (!paymentLink) {
       console.error('Moolre response missing payment link:', moolreData);

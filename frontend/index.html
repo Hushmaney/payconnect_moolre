@@ -4,6 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>PAYCONNECT — Checkout</title>
+  <!-- Load Tailwind CSS classes here for compatibility, though custom CSS is currently used. -->
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root{
       --bg:#f6f7fb;
@@ -75,10 +77,13 @@
       font-weight:700;
       font-size:15px;
       cursor:pointer;
+      transition: background-color 0.2s, opacity 0.2s;
     }
     .btn-pay{background:var(--accent);color:white;}
+    .btn-pay:hover:not([disabled]){background:#0963d3;}
     .btn-pay[disabled]{opacity:0.6;cursor:not-allowed}
     .btn-clear{background:transparent;border:1px solid #e6e9ef;color:#111827;}
+    .btn-clear:hover{background:#f3f4f6;}
     #message{grid-column:1 / -1; margin-top:14px}
     .msg{
       padding:12px;
@@ -162,6 +167,7 @@
   </main>
 
   <script>
+    // Make sure this URL matches your deployed backend on Render
     const BACKEND_URL = "https://payconnect-moolre-backend.onrender.com";
 
     const PLANS = {
@@ -248,15 +254,12 @@
 
     clearBtn.addEventListener('click', ()=>{
       document.getElementById('checkoutForm').reset();
+      // Manually reset dependent fields
       planSel.innerHTML = '<option value="">Select a network first</option>';
       planSel.disabled = true;
       amountInput.value = '';
       clearMessage();
     });
-
-    function genOrderId(){
-      return 'T' + (Math.floor(Math.random()*900000000000000)+100000000000000);
-    }
 
     document.getElementById('checkoutForm').addEventListener('submit', async e => {
       e.preventDefault(); clearMessage();
@@ -266,13 +269,24 @@
       const network = networkSel.value;
       const delivery = deliverySel.value;
       const planVal = planSel.value;
-      if(!phone || !recipient || !network || !planVal) return showMessage('All fields are required.','error');
+
+      // Basic client-side validation
+      if(!phone || !recipient || !network || !planVal) {
+        return showMessage('All required fields must be filled.','error');
+      }
 
       const plan = JSON.parse(planVal);
       const amount = delivery === 'Express' ? plan.express : plan.normal;
-      const orderId = genOrderId();
 
-      const payload = { email, phone, recipient, network, deliveryType: delivery, dataPlan: plan.name, amount, orderId };
+      // --- CRITICAL UPDATE: Simplified payload matching backend expectations ---
+      const payload = { 
+        email, 
+        phone, 
+        recipient, 
+        dataPlan: plan.name, // e.g., "MTN 5GB"
+        amount: Number(amount) // Ensure amount is sent as a number
+      };
+      // ------------------------------------------------------------------------
 
       payBtn.disabled = true; payBtn.textContent = 'Processing...';
       showMessage('Initiating payment...','info');
@@ -284,19 +298,37 @@
           body:JSON.stringify(payload)
         });
         const data = await res.json();
-        if(!res.ok) throw new Error(data.error || 'Failed to start payment');
+        
+        if(!res.ok) {
+          // Handle server-side errors (e.g., missing Moolre keys, bad request)
+          throw new Error(data.error || 'Failed to start payment due to server error.');
+        }
 
-        const link = data?.data?.paymentLink || data?.paymentLink;
-        if(link){ showMessage('Redirecting to Moolre...','info'); setTimeout(()=>window.location.href=link,500);}
-        else showMessage('No payment link received.','error');
+        // The backend returns the payment link directly under 'paymentLink'
+        const link = data?.paymentLink; 
+
+        if(link){ 
+          showMessage('Redirecting to Moolre...','info'); 
+          // Use a small delay before redirecting
+          setTimeout(()=>window.location.href=link,500);
+        }
+        else {
+          console.error('Moolre response missing payment link:', data);
+          showMessage('Payment initiation succeeded, but no payment link was received. Please check server logs.','error');
+        }
       }catch(err){
-        console.error(err); showMessage('Error: '+err.message,'error');
+        console.error('Checkout error:', err); 
+        showMessage('Error: '+err.message,'error');
       }finally{
-        payBtn.disabled=false; payBtn.textContent='Pay';
+        payBtn.disabled=false; 
+        payBtn.textContent='Pay';
       }
     });
 
-    (function init(){ planSel.innerHTML='<option value="">Select a network first</option>'; planSel.disabled=true; })();
+    // Initial setup on load
+    (function init(){ 
+      populatePlansForNetwork(networkSel.value);
+    })();
   </script>
 </body>
 </html>
