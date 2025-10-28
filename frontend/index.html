@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PAYCONNECT — Checkout</title>
+  <style>
+    :root{
+      --bg:#f6f7fb;
+      --card:#ffffff;
+      --accent:#0b74ff;
+      --muted:#6b7280;
+      --success:#065f46;
+      --danger:#7f1d1d;
+      --radius:10px;
+      --shadow: 0 8px 24px rgba(10,20,40,0.06);
+      --maxwidth:720px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background:var(--bg);
+      padding:28px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:100vh;
+    }
+    .card{
+      width:100%;
+      max-width:var(--maxwidth);
+      background:var(--card);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:22px;
+      position:relative;
+    }
+    h1{
+      margin:0 0 10px 0;
+      color:var(--accent);
+      font-size:20px;
+      text-align:center;
+      letter-spacing:0.2px;
+    }
+    form{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;}
+    label{
+      display:block;
+      font-weight:600;
+      font-size:13px;
+      margin-bottom:6px;
+      color:#111827;
+    }
+    .full{grid-column:1 / -1}
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    select{
+      width:100%;
+      padding:11px 12px;
+      border-radius:8px;
+      border:1px solid #e6e9ef;
+      background:white;
+      font-size:15px;
+      outline:none;
+    }
+    input[readonly]{
+      background:#f3f4f6;
+      color:#111827;
+    }
+    .muted{
+      color:var(--muted);
+      font-size:13px;
+      text-align:center;
+      margin-top:6px;
+      grid-column:1 / -1;
+    }
+    .actions{grid-column:1 / -1; display:flex; gap:12px; margin-top:6px;}
+    button{
+      flex:1;
+      padding:12px 14px;
+      border-radius:9px;
+      border: none;
+      font-weight:700;
+      font-size:15px;
+      cursor:pointer;
+    }
+    .btn-pay{
+      background:var(--accent);
+      color:white;
+    }
+    .btn-pay[disabled]{opacity:0.6;cursor:not-allowed}
+    .btn-clear{
+      background:transparent;
+      border:1px solid #e6e9ef;
+      color:#111827;
+    }
+    #message{grid-column:1 / -1; margin-top:14px}
+    .msg{
+      padding:12px;
+      border-radius:8px;
+      font-weight:600;
+      text-align:center;
+    }
+    .msg.success{background:#ecfdf5;color:var(--success); border:1px solid #bbf0d0}
+    .msg.error{background:#fff1f2;color:var(--danger); border:1px solid #f7c2c6}
+    .msg.info{background:#eff6ff;color:#1e3a8a;border:1px solid #dbeafe}
+    @media (max-width:640px){
+      form{grid-template-columns:1fr; gap:10px}
+      .actions{flex-direction:column}
+    }
+    input:focus, select:focus{box-shadow:0 4px 12px rgba(11,116,255,0.08); border-color:var(--accent)}
+    .small{font-size:13px; color:var(--muted)}
+  </style>
+</head>
+<body>
+  <main class="card" role="main">
+    <h1>PAYCONNECT</h1>
+
+    <form id="checkoutForm" autocomplete="off" novalidate>
+      <div class="full">
+        <label for="email">Customer Email (optional)</label>
+        <input id="email" type="email" inputmode="email" placeholder="you@example.com" />
+      </div>
+
+      <div>
+        <label for="phone">Customer Phone (Payer's MoMo Number)</label>
+        <input id="phone" type="tel" inputmode="numeric" placeholder="0541234567" pattern="[0-9]{10}" maxlength="10" required />
+      </div>
+
+      <div>
+        <label for="recipient">Data Recipient Number</label>
+        <input id="recipient" type="tel" inputmode="numeric" placeholder="0541234567" pattern="[0-9]{10}" maxlength="10" required />
+      </div>
+
+      <div>
+        <label for="network">Network</label>
+        <select id="network" required>
+          <option value="">Select Network</option>
+          <option value="MTN">MTN</option>
+          <option value="TELECEL">Telecel</option>
+          <option value="AIRTELTIGO">AirtelTigo</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="delivery">Delivery Type</label>
+        <select id="delivery" required>
+          <option value="Normal">Normal (30 mins - 4 hours)</option>
+          <option value="Express">Express (5 - 30 mins)</option>
+        </select>
+      </div>
+
+      <div class="full">
+        <label for="dataplan">Data Plan</label>
+        <select id="dataplan" required>
+          <option value="">Select a network first</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="amount">Amount (GHS)</label>
+        <input id="amount" type="text" readonly placeholder="0.00" />
+      </div>
+
+      <div class="muted full small">After clicking <strong>Pay</strong>, you'll be redirected to a secure Moorle payment page. Then you'll receive an SMS once payment is confirmed.</div>
+
+      <div class="actions full">
+        <button type="button" class="btn-clear" id="clearBtn">Clear</button>
+        <button type="submit" class="btn-pay" id="payBtn">Pay</button>
+      </div>
+
+      <div id="message" class="full" aria-live="polite"></div>
+    </form>
+  </main>
+
+  <script>
+    const BACKEND_URL = "https://payconnect-moolre-backend.onrender.com";
+
+    const PLANS = {
+      MTN: [
+        ["1GB", 5.50, 7.00],
+        ["2GB", 11.00, 13.00],
+        ["3GB", 15.50, 17.00],
+        ["4GB", 21.00, 23.00],
+        ["5GB", 25.00, 27.00],
+        ["6GB", 32.00, 35.00],
+        ["8GB", 40.00, 42.00],
+        ["10GB", 50.00, 52.00],
+        ["15GB", 72.00, 74.00],
+        ["20GB", 87.00, 89.00],
+        ["25GB", 110.00, 112.00],
+        ["30GB", 135.00, 137.00],
+        ["40GB", 175.00, 177.00],
+        ["50GB", 210.00, 212.00],
+        ["100GB", 405.00, 407.00]
+      ],
+      TELECEL: [
+        ["5GB", 24.00, 27.00],
+        ["10GB", 44.00, 47.00],
+        ["15GB", 63.00, 65.00],
+        ["20GB", 83.00, 85.00],
+        ["25GB", 101.00, 103.00],
+        ["30GB", 121.00, 122.00],
+        ["35GB", 150.00, 152.00],
+        ["40GB", 161.00, 163.00],
+        ["45GB", 190.00, 192.00],
+        ["50GB", 202.00, 204.00],
+        ["100GB", 375.00, 377.00]
+      ],
+      AIRTELTIGO: [
+        ["1GB", 4.50, 5.00],
+        ["2GB", 8.50, 9.50],
+        ["3GB", 13.00, 14.00],
+        ["4GB", 17.00, 18.00],
+        ["5GB", 23.00, 24.00],
+        ["6GB", 28.00, 29.00],
+        ["7GB", 32.00, 33.00],
+        ["8GB", 41.00, 42.00],
+        ["10GB", 47.00, 48.00],
+        ["12GB", 55.00, 56.00],
+        ["15GB", 72.00, 73.00],
+        ["20GB", 82.00, 83.00],
+        ["25GB", 98.00, 99.00],
+        ["30GB", 128.00, 129.00],
+        ["40GB", 175.00, 176.00],
+        ["50GB", 230.00, 231.00],
+        ["100GB", 440.00, 441.00]
+      ]
+    };
+
+    const networkSel = document.getElementById('network');
+    const planSel = document.getElementById('dataplan');
+    const amountInput = document.getElementById('amount');
+    const payBtn = document.getElementById('payBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const messageDiv = document.getElementById('message');
+    const deliverySel = document.getElementById('delivery');
+
+    function showMessage(text, type = 'info') {
+      messageDiv.innerHTML = '';
+      const d = document.createElement('div');
+      d.className = 'msg ' + (type === 'success' ? 'success' : (type === 'error' ? 'error' : 'info'));
+      d.textContent = text;
+      messageDiv.appendChild(d);
+    }
+    function clearMessage() { messageDiv.innerHTML = ''; }
+    function formatPrice(p){ return Number(p).toFixed(2); }
+
+    function populatePlansForNetwork(network){
+      planSel.innerHTML = '';
+      amountInput.value = '';
+      if(!network || !PLANS[network]){
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'Select a network first';
+        planSel.appendChild(opt);
+        planSel.disabled = true;
+        return;
+      }
+      planSel.disabled = false;
+      const headerOpt = document.createElement('option');
+      headerOpt.value = '';
+      headerOpt.textContent = 'Select Data Plan';
+      planSel.appendChild(headerOpt);
+
+      PLANS[network].forEach(plan=>{
+        const [name, normalPrice, expressPrice] = plan;
+        const option = document.createElement('option');
+        const payload = { name: `${network} ${name}`, normalPrice: Number(normalPrice), expressPrice: Number(expressPrice) };
+        option.value = JSON.stringify(payload);
+        option.textContent = `${name} — GHS ${formatPrice(normalPrice)} (Normal) / GHS ${formatPrice(expressPrice)} (Express)`;
+        planSel.appendChild(option);
+      });
+    }
+
+    function updateAmountFromPlan(){
+      try{
+        const val = planSel.value;
+        if(!val){ amountInput.value=''; return; }
+        const parsed = JSON.parse(val);
+        const delivery = deliverySel.value;
+        const p = delivery === 'Express' ? parsed.expressPrice : parsed.normalPrice;
+        amountInput.value = formatPrice(p);
+      }catch(e){
+        amountInput.value = '';
+      }
+    }
+
+    networkSel.addEventListener('change', (e)=>{ populatePlansForNetwork(e.target.value); clearMessage(); });
+    planSel.addEventListener('change', ()=>{ updateAmountFromPlan(); clearMessage(); });
+    deliverySel.addEventListener('change', ()=>{ updateAmountFromPlan(); clearMessage(); });
+
+    clearBtn.addEventListener('click', ()=>{
+      document.getElementById('checkoutForm').reset();
+      planSel.innerHTML = '<option value="">Select a network first</option>';
+      planSel.disabled = true;
+      amountInput.value = '';
+      clearMessage();
+    });
+
+    function genOrderId(){
+      const rand = Math.floor(Math.random()*900000000000000) + 100000000000000;
+      return 'T' + rand.toString();
+    }
+
+    document.getElementById('checkoutForm').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      clearMessage();
+
+      const email = document.getElementById('email').value.trim();
+      const phone = document.getElementById('phone').value.trim();
+      const recipient = document.getElementById('recipient').value.trim();
+      const network = networkSel.value;
+      const delivery = deliverySel.value;
+      const dataPlanValue = planSel.value;
+      const amount = amountInput.value;
+
+      if(!phone) return showMessage('Customer phone is required.', 'error');
+      if(!recipient) return showMessage('Recipient number is required.', 'error');
+      if(!network) return showMessage('Please select a network.', 'error');
+      if(!dataPlanValue) return showMessage('Please select a data plan.', 'error');
+      if(!amount) return showMessage('Amount is missing. Choose a data plan.', 'error');
+
+      let parsedPlan;
+      try{ parsedPlan = JSON.parse(dataPlanValue); }catch(err){ return showMessage('Invalid data plan.', 'error'); }
+
+      const orderId = genOrderId();
+
+      const payload = {
+        email,
+        phone,
+        recipient,
+        network,
+        deliveryType: delivery,
+        dataPlan: parsedPlan.name,
+        amount: Number(delivery === 'Express' ? parsedPlan.expressPrice : parsedPlan.normalPrice),
+        orderId
+      };
+
+      payBtn.disabled = true;
+      payBtn.textContent = 'Processing...';
+      showMessage('Initiating payment...','info');
+
+      try{
+        const res = await fetch(BACKEND_URL + '/api/start-checkout', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.error || data.message || 'Failed to start payment');
+
+        const paymentLink = data?.data?.paymentLink || data?.paymentLink || data?.data?.payment_link;
+        if(!paymentLink){
+          showMessage('Payment started but no redirect link received. Check server logs.', 'error');
+          console.warn('start-checkout response:', data);
+        } else {
+          showMessage('Redirecting to payment page...', 'info');
+          setTimeout(()=> window.location.href = paymentLink, 300);
+        }
+      }catch(err){
+        console.error(err);
+        showMessage('Error: ' + (err.message || 'Something went wrong'), 'error');
+      }finally{
+        payBtn.disabled = false;
+        payBtn.textContent = 'Pay';
+      }
+    });
+
+    (function init(){
+      planSel.innerHTML = '<option value="">Select a network first</option>';
+      planSel.disabled = true;
+      amountInput.value = '';
+    })();
+  </script>
+</body>
+</html>
