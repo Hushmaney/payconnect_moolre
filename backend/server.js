@@ -36,7 +36,7 @@ const AIRTABLE_BASE = process.env.AIRTABLE_BASE || '';
 const AIRTABLE_TABLE = process.env.AIRTABLE_TABLE || 'Orders';
 const BASE_URL = process.env.BASE_URL || 'https://payconnect-moolre-backend.onrender.com';
 
-// --- NEW HELPER: AIRTABLE READ RECORD (For Idempotency Check) ---
+// --- AIRTABLE READ RECORD (For Idempotency Check) ---
 async function airtableRead(externalRef) {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE) {
     console.error('Airtable environment variables missing for read.');
@@ -111,14 +111,15 @@ async function sendHubtelSMS(to, message) {
   }
 }
 
-// ====== START CHECKOUT (Restored 'delivery' field in metadata) ======
+// ====== START CHECKOUT (Delivery option merged into dataPlan) ======
 app.post('/api/start-checkout', async (req, res) => {
   try {
-    // Ensure 'delivery' is included here
-    const { email, phone, recipient, dataPlan, amount, delivery } = req.body; 
+    // Delivery is now expected to be part of dataPlan string in the frontend,
+    // so we don't need a separate field here in the body destructuring.
+    const { email, phone, recipient, dataPlan, amount } = req.body; 
 
-    // Ensure 'delivery' is validated (if not in required fields before, let's assume it is now)
-    if (!phone || !recipient || !dataPlan || !amount || !delivery) { 
+    // Validation relies on the frontend sending the merged dataPlan
+    if (!phone || !recipient || !dataPlan || !amount) { 
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -143,8 +144,8 @@ app.post('/api/start-checkout', async (req, res) => {
       reusable: false,
       externalref: orderId,
       callback: `${BASE_URL}/api/webhook/moolre`,
-      // Pass the delivery option to the Moolre metadata
-      metadata: { customer_id: phone, dataPlan, recipient, delivery } 
+      // Pass the MERGED dataPlan string to the Moolre metadata
+      metadata: { customer_id: phone, dataPlan, recipient } 
     };
 
     const response = await axios.post(`${MOOLRE_BASE}/embed/link`, payload, { headers });
@@ -163,7 +164,7 @@ app.post('/api/start-checkout', async (req, res) => {
   }
 });
 
-// ====== MOOLRE WEBHOOK (MODIFIED WITH IDEMPOTENCY CHECK) ======
+// ====== MOOLRE WEBHOOK (MODIFIED FOR MERGED DATAPLAN) ======
 app.post('/api/webhook/moolre', async (req, res) => {
   let smsResult = { success: false, error: 'SMS not sent' };
 
@@ -185,10 +186,12 @@ app.post('/api/webhook/moolre', async (req, res) => {
     const customerPhone = cleanPhoneNumber(customerPhoneRaw);
     
     const amount = data.amount || '';
-    const dataPlan = data.metadata?.dataPlan || '';
+    // DataPlan now contains the delivery option (e.g., "MTN 1GB (Express)")
+    const dataPlanWithDelivery = data.metadata?.dataPlan || ''; 
     const recipient = data.metadata?.recipient || '';
-    // Restore delivery option extraction
-    const deliveryOption = data.metadata?.delivery || 'Normal'; 
+    
+    // Determine delivery type for SMS based on the combined string
+    const isExpress = dataPlanWithDelivery.toLowerCase().includes('(express)');
 
     if (txstatus === 1) {
       
@@ -201,26 +204,25 @@ app.post('/api/webhook/moolre', async (req, res) => {
       }
       // --- END IDEMPOTENCY CHECK ---
 
-      // ✅ Payment successful - DETERMINE SMS TEXT (using delivery option)
+      // ✅ Payment successful - DETERMINE SMS TEXT (using merged dataPlan)
       let smsText;
-      if (deliveryOption.toLowerCase() === 'express') {
-        smsText = `Your data purchase of ${dataPlan} for ${recipient} has been processed and will be delivered in 5-30 minutes. Order ID: ${externalref}. For support, WhatsApp: 233531300654;`
+      if (isExpress) {
+        smsText = `Your data purchase of ${dataPlanWithDelivery} for ${recipient} has been processed and will be delivered in 5-30 minutes. Order ID: ${externalref}. For support, WhatsApp: 233531300654;`
       } else {
-        // Normal Delivery or any other unrecognised option
-        smsText = `Your data purchase of ${dataPlan} for ${recipient} has been processed and will be delivered in 30 minutes to 4 hours. Order ID: ${externalref}. For support, WhatsApp: 233531300654;`
+        smsText = `Your data purchase of ${dataPlanWithDelivery} for ${recipient} has been processed and will be delivered in 30 minutes to 4 hours. Order ID: ${externalref}. For support, WhatsApp: 233531300654;`
       }
 
       smsResult = await sendHubtelSMS(customerPhone, smsText);
 
-      // ✅ Create Airtable record (Only executes if no duplicate was found)
+      // ✅ Create Airtable record (Only uses the single Data Plan field)
       const fields = {
         "Order ID": externalref,
         "Customer Phone": customerPhone,
         "Data Recipient Number": recipient,
-        "Data Plan": dataPlan,
+        "Data Plan": dataPlanWithDelivery, // Use the merged string for Airtable
         "Amount": Number(amount),
         "Status": "Pending",
-        "Delivery Option": deliveryOption, // Include for logging/tracking
+        // REMOVED "Delivery Option" FIELD
         "Hubtel Sent": smsResult.success,
         "Hubtel Response": JSON.stringify(smsResult.data || smsResult.error || {})
       };
