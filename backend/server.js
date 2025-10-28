@@ -3,7 +3,6 @@ const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 app.use(cors());
@@ -12,8 +11,8 @@ app.use(bodyParser.json());
 // ====== ENVIRONMENT CONFIG ======
 const PORT = process.env.PORT || 3000;
 const MOOLRE_BASE = process.env.MOOLRE_BASE || 'https://api.moolre.com';
-const MOOLRE_USERNAME = process.env.MOOLRE_USERNAME || '';
 const MOOLRE_PUBLIC_API_KEY = process.env.MOOLRE_PUBLIC_API_KEY || '';
+const MOOLRE_USERNAME = process.env.MOOLRE_USERNAME || '';
 const MOOLRE_SECRET = process.env.MOOLRE_SECRET || '';
 
 const HUBTEL_CLIENT_ID = process.env.HUBTEL_CLIENT_ID || '';
@@ -23,8 +22,9 @@ const HUBTEL_SENDER = process.env.HUBTEL_SENDER || 'Pconnect';
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY || '';
 const AIRTABLE_BASE = process.env.AIRTABLE_BASE || '';
 const AIRTABLE_TABLE = process.env.AIRTABLE_TABLE || 'Orders';
+const BASE_URL = process.env.BASE_URL || 'https://payconnect-moolre-backend.onrender.com';
 
-// ====== AIRTABLE HELPERS ======
+// ====== AIRTABLE CREATE RECORD ======
 async function airtableCreate(fields) {
   const url = `https://api.airtable.com/v0/${AIRTABLE_BASE}/${encodeURIComponent(AIRTABLE_TABLE)}`;
   const res = await axios.post(url, { fields }, {
@@ -36,79 +36,42 @@ async function airtableCreate(fields) {
   return res.data;
 }
 
-async function airtableUpdate(recordId, fields) {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE}/${encodeURIComponent(AIRTABLE_TABLE)}/${recordId}`;
-  const res = await axios.patch(url, { fields }, {
-    headers: {
-      Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-      'Content-Type': 'application/json'
-    }
-  });
-  return res.data;
-}
-
-async function airtableFindByOrderId(orderId) {
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE}/${encodeURIComponent(AIRTABLE_TABLE)}?filterByFormula=({Order ID}='${orderId}')`;
-  const res = await axios.get(url, {
-    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
-  });
-  return res.data.records && res.data.records.length ? res.data.records[0] : null;
-}
-
 // ====== HUBTEL SMS ======
 async function sendHubtelSMS(to, message) {
-  if (!HUBTEL_CLIENT_ID || !HUBTEL_CLIENT_SECRET) {
-    console.warn('Hubtel credentials missing; skipping SMS.');
-    return { success: false, error: 'no-credentials' };
-  }
-  const token = Buffer.from(`${HUBTEL_CLIENT_ID}:${HUBTEL_CLIENT_SECRET}`).toString('base64');
-  const payload = {
-    From: HUBTEL_SENDER,
-    To: to,
-    Content: message,
-    ClientId: HUBTEL_CLIENT_ID
-  };
-
   try {
+    const token = Buffer.from(`${HUBTEL_CLIENT_ID}:${HUBTEL_CLIENT_SECRET}`).toString('base64');
+    const payload = {
+      From: HUBTEL_SENDER,
+      To: to,
+      Content: message,
+      ClientId: HUBTEL_CLIENT_ID
+    };
+
     const res = await axios.post('https://api.hubtel.com/v1/messages', payload, {
       headers: { Authorization: `Basic ${token}`, 'Content-Type': 'application/json' }
     });
+
     return { success: true, data: res.data };
   } catch (err) {
-    console.error('Hubtel send error', err.response?.data || err.message || err);
+    console.error('Hubtel send error', err.response?.data || err.message);
     return { success: false, error: err.response?.data || err.message };
   }
 }
 
-// ====== START CHECKOUT ======
+// ====== START CHECKOUT (PAYMENT INITIATION) ======
 app.post('/api/start-checkout', async (req, res) => {
   try {
-    const { email, phone, recipient, network, deliveryType, dataPlan, amount, orderId } = req.body;
-    const providedOrderId = orderId || ('T' + Math.floor(Math.random() * 900000000000000 + 100000000000000));
+    const { email, phone, recipient, dataPlan, amount } = req.body;
 
-    if (!phone || !recipient || !network || !dataPlan || !amount) {
+    if (!phone || !recipient || !dataPlan || !amount) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Step 1: Create Airtable record
-    const airtableFields = {
-      "Order ID": providedOrderId,
-      "Customer Phone": phone,
-      "Customer Email": email || '',
-      "Data Recipient Number": recipient,
-      "Data Plan": dataPlan,
-      "Amount": Number(amount),
-      "Status": "Pending",
-      "Hubtel Sent": "No",
-      "Delivery Type": deliveryType || 'Normal'
-    };
-    const airtableRes = await airtableCreate(airtableFields);
-    const airtableId = airtableRes.id;
+    const orderId = 'T' + Math.floor(Math.random() * 900000000000000 + 100000000000000);
 
-    // Step 2: Create Moolre payment link
+    // Request payment link from Moolre
     const headers = {
       'Content-Type': 'application/json',
-      'X-API-USER': MOOLRE_USERNAME,
       'X-API-PUBKEY': MOOLRE_PUBLIC_API_KEY
     };
 
@@ -118,56 +81,32 @@ app.post('/api/start-checkout', async (req, res) => {
       currency: 'GHS',
       email: email || 'noemail@payconnect.com',
       reusable: false,
-      externalref: providedOrderId,
-      callback: `${process.env.BASE_URL || 'https://payconnect-moolre-backend.onrender.com'}/api/webhook/moolre`,
-      accountnumber: '100000100002',
+      externalref: orderId,
+      callback: `${BASE_URL}/api/webhook/moolre`,
       metadata: { customer_id: phone }
     };
 
-    const mRes = await axios.post(`${MOOLRE_BASE}/embed/link`, payload, { headers });
-    const mData = mRes.data || {};
-    const paymentLink = mData.data?.authorization_url || mData.data?.payment_link || mData.data?.redirect_url || null;
+    const response = await axios.post(`${MOOLRE_BASE}/embed/link`, payload, { headers });
+    const moolreData = response.data;
+    const paymentLink = moolreData.data?.payment_link || moolreData.data?.redirect_url;
 
-    // Step 3: Update Airtable with Moolre response
-    try {
-      await airtableUpdate(airtableId, { "Moolre Response": JSON.stringify(mData) });
-    } catch (err) {
-      console.warn('Failed to update Airtable with Moolre response', err.message || err);
-    }
-
-    // Step 4: Return result
-    if (!paymentLink) {
-      return res.status(500).json({
-        error: 'Failed to get payment link from Moolre',
-        details: mData
-      });
-    }
-
-    return res.json({
-      success: true,
-      data: { airtableId, orderId: providedOrderId, paymentLink, moolre: mData }
-    });
-
+    return res.json({ success: true, orderId, paymentLink, moolreData });
   } catch (err) {
-    console.error('start-checkout error', err.response?.data || err.message || err);
+    console.error('start-checkout error', err.response?.data || err.message);
     return res.status(500).json({
       error: 'Failed to start checkout',
-      details: err.response?.data || err.message || ''
+      details: err.response?.data || err.message
     });
   }
 });
 
-// ====== MOOLRE WEBHOOK ======
+// ====== MOOLRE WEBHOOK (PAYMENT CONFIRMATION) ======
 app.post('/api/webhook/moolre', async (req, res) => {
   try {
     const payload = req.body || {};
     const data = payload.data || {};
-
     const incomingSecret = data.secret || payload.secret || '';
-    if (!MOOLRE_SECRET) {
-      console.warn('MOOLRE_SECRET not configured');
-      return res.status(401).json({ error: 'Webhook secret not configured' });
-    }
+
     if (incomingSecret !== MOOLRE_SECRET) {
       console.warn('Invalid webhook secret');
       return res.status(401).json({ error: 'Invalid webhook secret' });
@@ -177,42 +116,38 @@ app.post('/api/webhook/moolre', async (req, res) => {
     const externalref = data.externalref || '';
     const payer = data.payer || '';
     const amount = data.amount || '';
+    const dataPlan = data.metadata?.dataPlan || '';
+    const recipient = data.metadata?.recipient || '';
 
-    const record = await airtableFindByOrderId(externalref);
-    if (!record) {
-      console.warn('Airtable record not found for externalref', externalref);
-      return res.json({ success: true, message: 'record-not-found' });
-    }
-    const airtableId = record.id;
-
+    // Only act if payment is successful
     if (txstatus === 1) {
-      const delivery = record.fields['Delivery Type'] || 'Normal';
-      const dataPlan = record.fields['Data Plan'] || '';
-      const recipient = record.fields['Data Recipient Number'] || '';
-      const orderId = record.fields['Order ID'] || externalref;
-      const deliveryText = (delivery === 'Express') ? '5–30 minutes' : '30 minutes to 4 hours';
+      // Step 1: Send SMS
+      const smsText = `Payment received for ${dataPlan || 'your order'} (${amount} GHS). Your data will be delivered shortly. Order ID: ${externalref}. For support: WhatsApp 0531300654`;
 
-      const sms = `Your data purchase of ${dataPlan} for ${recipient} has been processed and will be delivered in ${deliveryText}. Order ID: ${orderId}. For support, WhatsApp: 233531300654`;
+      const smsResult = await sendHubtelSMS(payer || recipient, smsText);
+      const hubtelSent = smsResult.success ? 'Yes' : 'No';
+      const hubtelResponse = JSON.stringify(smsResult.data || smsResult.error || {});
 
-      const smsResult = await sendHubtelSMS(payer || record.fields['Customer Phone'] || recipient, sms);
-
-      await airtableUpdate(airtableId, {
+      // Step 2: Create Airtable record
+      const fields = {
+        "Order ID": externalref,
+        "Customer Phone": payer,
+        "Data Recipient Number": recipient,
+        "Data Plan": dataPlan,
+        "Amount": Number(amount),
         "Status": "Pending",
-        "Hubtel Sent": smsResult && smsResult.success ? "Yes" : "No",
-        "Moolre Response": JSON.stringify(payload)
-      });
+        "Hubtel Sent": hubtelSent,
+        "Hubtel Response": hubtelResponse
+      };
 
-      return res.json({ success: true });
-    } else {
-      await airtableUpdate(airtableId, {
-        "Moolre Response": JSON.stringify(payload),
-        "Hubtel Sent": "No"
-      });
-      return res.json({ success: true });
+      await airtableCreate(fields);
+      return res.json({ success: true, message: 'Airtable record created and SMS sent' });
     }
 
+    // Ignore failed or pending payments
+    return res.json({ success: true, message: 'Payment not successful' });
   } catch (err) {
-    console.error('webhook handler error', err.response?.data || err.message || err);
+    console.error('webhook handler error', err.response?.data || err.message);
     return res.status(500).json({ error: 'webhook handler internal error' });
   }
 });
