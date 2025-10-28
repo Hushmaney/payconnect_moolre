@@ -9,8 +9,26 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Utility to strip all non-digit characters from a phone number
+// This is used to ensure Hubtel only receives digits.
 function cleanPhoneNumber(phone) {
-  return phone ? phone.replace(/\D/g, '') : '';
+  // Check if phone is a string before running replace
+  return typeof phone === 'string' ? phone.replace(/\D/g, '') : '';
+}
+
+// Function to safely extract a number string from a complex payer string (e.g., "Name (233...)")
+function extractNumberFromPayer(payerString, metadataPhone) {
+  if (!payerString) {
+    return metadataPhone || '';
+  }
+  
+  // Regex to find a number within parentheses, or the whole string if no parentheses
+  const match = payerString.match(/\(([^)]+)\)/);
+  if (match && match[1]) {
+    // If a number is found in parentheses (e.g., "233531300654")
+    return match[1];
+  }
+  // Otherwise, return the original payer string or the metadata phone
+  return payerString || metadataPhone || '';
 }
 
 // ====== ENVIRONMENT CONFIG ======
@@ -72,9 +90,16 @@ async function sendHubtelSMS(to, message) {
       From: HUBTEL_SENDER,
       // Use the cleaned number
       To: cleanedTo,
-      Content: message,
       ClientId: HUBTEL_CLIENT_ID
     };
+    
+    // CRITICAL: Hubtel requires the message content
+    if (message) {
+      payload.Content = message;
+    } else {
+      console.warn('SMS message content is empty.');
+    }
+
 
     const res = await axios.post('https://api.hubtel.com/v1/messages', payload, {
       headers: { Authorization: `Basic ${token}`, 'Content-Type': 'application/json' }
@@ -161,11 +186,13 @@ app.post('/api/webhook/moolre', async (req, res) => {
     const txstatus = Number(data.txstatus || 0);
     const externalref = data.externalref || '';
     
-    // Original payer field from Moolre (which is coming back empty)
+    // Original payer field from Moolre (e.g., "Name (233...)")
     const payerFromMoolre = data.payer || ''; 
+    const metadataPhone = data.metadata?.customer_id || '';
     
-    // CRITICAL FIX: Get customer phone number from 'payer' or FALLBACK to 'metadata.customer_id'
-    const customerPhone = payerFromMoolre || data.metadata?.customer_id || ''; 
+    // CRITICAL FIX: Extract the clean number string from the complex payer field, falling back to metadata phone
+    const customerPhoneRaw = extractNumberFromPayer(payerFromMoolre, metadataPhone);
+    const customerPhone = cleanPhoneNumber(customerPhoneRaw);
     
     const amount = data.amount || '';
     const dataPlan = data.metadata?.dataPlan || '';
@@ -177,21 +204,21 @@ app.post('/api/webhook/moolre', async (req, res) => {
       // 1. Send confirmation SMS
       try {
         const smsText = `Your data purchase of ${dataPlan} for ${recipient} has been processed and will be delivered in 30 minutes to 4 hours. Order ID: ${externalref}. For support, WhatsApp: 233531300654`;
-        // Use the reliably retrieved customerPhone
+        // Use the reliably retrieved and cleaned customerPhone
         smsResult = await sendHubtelSMS(customerPhone, smsText); 
       } catch (smsError) {
         console.error('Failed to send Hubtel SMS, proceeding with Airtable log:', smsError.message);
         smsResult.error = `Failed to send SMS: ${smsError.message}`;
       }
       
-      // FIX: Use the boolean success value directly for Airtable (true/false)
+      // Use the boolean success value directly for Airtable (true/false)
       const hubtelSent = smsResult.success; 
       const hubtelResponse = JSON.stringify(smsResult.data || smsResult.error || {});
 
       // 2. CREATE AIRTABLE RECORD HERE
       const fields = {
         "Order ID": externalref,
-        "Customer Phone": customerPhone, // Use the reliably retrieved customerPhone
+        "Customer Phone": customerPhone, // Now contains only the clean number
         "Data Recipient Number": recipient,
         "Data Plan": dataPlan,
         "Amount": Number(amount),
