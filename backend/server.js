@@ -11,10 +11,10 @@ app.use(bodyParser.json());
 
 // ====== ENVIRONMENT CONFIG ======
 const PORT = process.env.PORT || 3000;
-const MOORLE_BASE = process.env.MOORLE_BASE || 'https://api.moolre.com';
-const MOORLE_USERNAME = process.env.MOORLE_USERNAME || '';
-const MOORLE_PUBLIC_API_KEY = process.env.MOORLE_PUBLIC_API_KEY || '';
-const MOORLE_SECRET = process.env.MOORLE_SECRET || '';
+const MOOLRE_BASE = process.env.MOOLRE_BASE || 'https://api.moolre.com';
+const MOOLRE_USERNAME = process.env.MOOLRE_USERNAME || '';
+const MOOLRE_PUBLIC_API_KEY = process.env.MOOLRE_PUBLIC_API_KEY || '';
+const MOOLRE_SECRET = process.env.MOOLRE_SECRET || '';
 
 const HUBTEL_CLIENT_ID = process.env.HUBTEL_CLIENT_ID || '';
 const HUBTEL_CLIENT_SECRET = process.env.HUBTEL_CLIENT_SECRET || '';
@@ -108,8 +108,8 @@ app.post('/api/start-checkout', async (req, res) => {
     // Step 2: Create Moolre payment link
     const headers = {
       'Content-Type': 'application/json',
-      'X-API-USER': MOORLE_USERNAME,
-      'X-API-PUBKEY': MOORLE_PUBLIC_API_KEY
+      'X-API-USER': MOOLRE_USERNAME,
+      'X-API-PUBKEY': MOOLRE_PUBLIC_API_KEY
     };
 
     const payload = {
@@ -119,26 +119,33 @@ app.post('/api/start-checkout', async (req, res) => {
       email: email || 'noemail@payconnect.com',
       reusable: false,
       externalref: providedOrderId,
-      callback: `${process.env.BASE_URL || 'https://payconnect-moolre-backend.onrender.com'}/api/webhook/moorle`,
+      callback: `${process.env.BASE_URL || 'https://payconnect-moolre-backend.onrender.com'}/api/webhook/moolre`,
       accountnumber: '100000100002',
       metadata: { customer_id: phone }
     };
 
-    const mRes = await axios.post(`${MOORLE_BASE}/embed/link`, payload, { headers });
+    const mRes = await axios.post(`${MOOLRE_BASE}/embed/link`, payload, { headers });
     const mData = mRes.data || {};
-    const paymentLink = mData.data?.payment_link || mData.data?.redirect_url || null;
+    const paymentLink = mData.data?.authorization_url || mData.data?.payment_link || mData.data?.redirect_url || null;
 
     // Step 3: Update Airtable with Moolre response
     try {
       await airtableUpdate(airtableId, { "Moolre Response": JSON.stringify(mData) });
     } catch (err) {
-      console.warn('Failed to update Airtable with Moorle response', err.message || err);
+      console.warn('Failed to update Airtable with Moolre response', err.message || err);
     }
 
     // Step 4: Return result
+    if (!paymentLink) {
+      return res.status(500).json({
+        error: 'Failed to get payment link from Moolre',
+        details: mData
+      });
+    }
+
     return res.json({
       success: true,
-      data: { airtableId, orderId: providedOrderId, paymentLink, moorle: mData }
+      data: { airtableId, orderId: providedOrderId, paymentLink, moolre: mData }
     });
 
   } catch (err) {
@@ -150,18 +157,18 @@ app.post('/api/start-checkout', async (req, res) => {
   }
 });
 
-// ====== MOORLE WEBHOOK ======
-app.post('/api/webhook/moorle', async (req, res) => {
+// ====== MOOLRE WEBHOOK ======
+app.post('/api/webhook/moolre', async (req, res) => {
   try {
     const payload = req.body || {};
     const data = payload.data || {};
 
     const incomingSecret = data.secret || payload.secret || '';
-    if (!MOORLE_SECRET) {
-      console.warn('MOORLE_SECRET not configured');
+    if (!MOOLRE_SECRET) {
+      console.warn('MOOLRE_SECRET not configured');
       return res.status(401).json({ error: 'Webhook secret not configured' });
     }
-    if (incomingSecret !== MOORLE_SECRET) {
+    if (incomingSecret !== MOOLRE_SECRET) {
       console.warn('Invalid webhook secret');
       return res.status(401).json({ error: 'Invalid webhook secret' });
     }
@@ -212,9 +219,9 @@ app.post('/api/webhook/moorle', async (req, res) => {
 
 // ====== TEST ROUTE ======
 app.get('/api/test', (req, res) => {
-  res.json({ message: '✅ Payconnect Moorle backend is live!' });
+  res.json({ message: '✅ Payconnect Moolre backend is live!' });
 });
 
 app.listen(PORT, () => {
-  console.log(`✅ Payconnect Moorle backend running on port ${PORT}`);
+  console.log(`✅ Payconnect Moolre backend running on port ${PORT}`);
 });
