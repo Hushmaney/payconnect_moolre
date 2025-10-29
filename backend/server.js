@@ -141,7 +141,7 @@ app.post('/api/start-checkout', async (req, res) => {
       externalref: orderId,
       callback: `${BASE_URL}/api/webhook/moolre`,
       redirect: FINAL_REDIRECT_URL, // ADDED REDIRECT
-      metadata: { customer_id: phone, dataPlan, recipient } 
+      metadata: { customer_id: phone, dataPlan, recipient, email } 
     };
 
     const response = await axios.post(`${MOOLRE_BASE}/embed/link`, payload, { headers });
@@ -160,7 +160,7 @@ app.post('/api/start-checkout', async (req, res) => {
   }
 });
 
-// ====== MOOLRE WEBHOOK (MODIFIED FOR MERGED DATAPLAN) ======
+// ====== MOOLRE WEBHOOK (MODIFIED FOR MERGED DATAPLAN AND EMAIL) ======
 app.post('/api/webhook/moolre', async (req, res) => {
   let smsResult = { success: false, error: 'SMS not sent' };
 
@@ -180,6 +180,8 @@ app.post('/api/webhook/moolre', async (req, res) => {
     const metadataPhone = data.metadata?.customer_id || '';
     const customerPhoneRaw = extractNumberFromPayer(payerFromMoolre, metadataPhone);
     const customerPhone = cleanPhoneNumber(customerPhoneRaw);
+
+    const email = data.metadata?.email || data.email || 'noemail@payconnect.com'; // NEW EMAIL FIELD
     
     const amount = data.amount || '';
     const dataPlanWithDelivery = data.metadata?.dataPlan || ''; 
@@ -200,13 +202,13 @@ app.post('/api/webhook/moolre', async (req, res) => {
       const fields = {
         "Order ID": externalref,
         "Customer Phone": customerPhone,
+        "Customer Email": email, // NEW FIELD ADDED
         "Data Recipient Number": recipient,
         "Data Plan": dataPlanWithDelivery,
         "Amount": Number(amount),
         "Status": "Pending",
         "Hubtel Sent": smsResult.success,
         "Hubtel Response": JSON.stringify(smsResult.data || smsResult.error || {}),
-        "Customer Email": email
       };
 
       await airtableCreate(fields);
