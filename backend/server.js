@@ -26,6 +26,8 @@ const MOOLRE_PUBLIC_API_KEY = process.env.MOOLRE_PUBLIC_API_KEY || '';
 const MOOLRE_USERNAME = process.env.MOOLRE_USERNAME || '';
 const MOOLRE_SECRET = process.env.MOOLRE_SECRET || '';
 const MOOLRE_ACCOUNT_NUMBER = process.env.MOOLRE_ACCOUNT_NUMBER || '';
+// ✅ Define the desired final redirect URL here
+const FINAL_REDIRECT_URL = 'https://ovaldataafrica.glide.page/'; 
 
 const HUBTEL_CLIENT_ID = process.env.HUBTEL_CLIENT_ID || '';
 const HUBTEL_CLIENT_SECRET = process.env.HUBTEL_CLIENT_SECRET || '';
@@ -144,8 +146,10 @@ app.post('/api/start-checkout', async (req, res) => {
       reusable: false,
       externalref: orderId,
       callback: `${BASE_URL}/api/webhook/moolre`,
-      // ✅ ADDED FINAL REDIRECT LINK HERE
-      return_url: 'https://ovaldataafrica.glide.page/',
+      // ❌ Changed from return_url to redirect_url (or both included) 
+      // The parameter name for the final redirect may be sensitive.
+      return_url: FINAL_REDIRECT_URL,
+      redirect_url: FINAL_REDIRECT_URL, // ✅ TRYING 'redirect_url' AS AN ALTERNATIVE
       // Pass the MERGED dataPlan string to the Moolre metadata
       metadata: { customer_id: phone, dataPlan, recipient } 
     };
