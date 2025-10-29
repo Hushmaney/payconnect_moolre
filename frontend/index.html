@@ -4,7 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>PAYCONNECT — Checkout</title>
-  <!-- Load Tailwind CSS classes here for compatibility, though custom CSS is currently used. -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root{
@@ -38,10 +37,11 @@
       padding:22px;
       position:relative;
     }
+    /* MODIFIED: H1 font size increased AGAIN for maximum visibility */
     h1{
       margin:0 0 10px 0;
       color:var(--accent);
-      font-size:20px;
+      font-size: 36px; /* Increased from 28px */
       text-align:center;
       letter-spacing:0.2px;
     }
@@ -79,7 +79,13 @@
       cursor:pointer;
       transition: background-color 0.2s, opacity 0.2s;
     }
-    .btn-pay{background:var(--accent);color:white;}
+    /* Pay button styles (already made bigger in previous step) */
+    .btn-pay{
+      background:var(--accent);
+      color:white;
+      padding: 14px 14px; 
+      font-size: 17px; 
+    }
     .btn-pay:hover:not([disabled]){background:#0963d3;}
     .btn-pay[disabled]{opacity:0.6;cursor:not-allowed}
     .btn-clear{background:transparent;border:1px solid #e6e9ef;color:#111827;}
@@ -97,9 +103,54 @@
     @media (max-width:640px){
       form{grid-template-columns:1fr;gap:10px}
       .actions{flex-direction:column}
+      .btn-pay{padding: 16px 14px; font-size: 18px;} 
     }
     input:focus,select:focus{box-shadow:0 4px 12px rgba(11,116,255,0.08);border-color:var(--accent)}
     .small{font-size:13px;color:var(--muted)}
+
+    /* NEW STYLES FROM CODE BLOCK 2 FOR OVERLAY */
+    body.lock-scroll {
+        overflow: hidden;
+    }
+    #fullScreenOverlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.95);
+        display: none;
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+        opacity: 0; 
+        transition: opacity 0.3s;
+    }
+    #overlayMessageContent {
+        background: #eff6ff;
+        color: #1e3a8a;
+        padding: 30px 40px;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        max-width: 80%;
+        text-align: center;
+        font-size: 18px;
+        font-weight: 600;
+        line-height: 1.5;
+    }
+    .spinner {
+        border: 4px solid rgba(11, 116, 255, 0.2);
+        border-top: 4px solid #0b74ff;
+        border-radius: 50%;
+        width: 25px;
+        height: 25px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 15px auto;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
@@ -118,20 +169,30 @@
       </div>
 
       <div>
-        <label for="recipient">Data Recipient Number</label>
-        <input id="recipient" type="tel" inputmode="numeric" placeholder="0541234567" pattern="[0-9]{10}" maxlength="10" required />
-      </div>
-
-      <div>
-        <label for="network">Network</label>
-        <select id="network" required>
-          <option value="">Select Network</option>
+        <label for="payerNetwork">Payer's MoMo Network</label>
+        <select id="payerNetwork" required>
+          <option value="">Select MoMo Network</option>
           <option value="MTN">MTN</option>
           <option value="TELECEL">Telecel</option>
           <option value="AIRTELTIGO">AirtelTigo</option>
         </select>
       </div>
 
+      <div>
+        <label for="recipient">Data Recipient Number</label>
+        <input id="recipient" type="tel" inputmode="numeric" placeholder="0541234567" pattern="[0-9]{10}" maxlength="10" required />
+      </div>
+
+      <div>
+        <label for="recipientNetwork">Recipient Network</label>
+        <select id="recipientNetwork" required>
+          <option value="">Select Recipient Network</option>
+          <option value="MTN">MTN</option>
+          <option value="TELECEL">Telecel</option>
+          <option value="AIRTELTIGO">AirtelTigo</option>
+        </select>
+      </div>
+      
       <div>
         <label for="delivery">Delivery Type</label>
         <select id="delivery" required>
@@ -166,61 +227,179 @@
     </form>
   </main>
 
+  <div id="fullScreenOverlay">
+    <div id="overlayMessageContent"></div>
+  </div>
+
   <script>
-    // Make sure this URL matches your deployed backend on Render
     const BACKEND_URL = "https://payconnect-moolre-backend.onrender.com";
 
+    // Re-using the PLAN structure from Code Block 1
     const PLANS = {
       MTN: [
-        ["1GB", 5.50, 7.00],
-        ["2GB", 11.00, 13.00],
-        ["3GB", 15.50, 17.00],
-        ["4GB", 21.00, 23.00],
-        ["5GB", 25.00, 27.00],
-        ["6GB", 32.00, 35.00],
-        ["8GB", 40.00, 42.00],
-        ["10GB", 50.00, 52.00],
-        ["15GB", 72.00, 74.00],
-        ["20GB", 87.00, 89.00]
+          ["1GB", 1.00, 1.00], 
+          ["2GB", 11.00, 13.00],
+          ["3GB", 15.50, 17.00],
+          ["4GB", 21.00, 23.00],
+          ["5GB", 25.00, 27.00],
+          ["6GB", 32.00, 35.00],
+          ["8GB", 40.00, 42.00],
+          ["10GB", 50.00, 52.00],
+          ["15GB", 72.00, 74.00],
+          ["20GB", 87.00, 89.00],
+          ["25GB", 110.00, 112.00],
+          ["30GB", 135.00, 137.00],
+          ["40GB", 175.00, 177.00],
+          ["50GB", 210.00, 212.00],
+          ["100GB", 405.00, 407.00]
       ],
       TELECEL: [
-        ["5GB", 24.00, 27.00],
-        ["10GB", 44.00, 47.00],
-        ["15GB", 63.00, 65.00],
-        ["20GB", 83.00, 85.00]
+          ["5GB", 24.00, 27.00],
+          ["10GB", 44.00, 47.00],
+          ["15GB", 63.00, 65.00],
+          ["20GB", 83.00, 85.00],
+          ["25GB", 101.00, 103.00],
+          ["30GB", 121.00, 122.00],
+          ["35GB", 150.00, 152.00],
+          ["40GB", 161.00, 163.00],
+          ["45GB", 190.00, 192.00],
+          ["50GB", 202.00, 204.00],
+          ["100GB", 375.00, 377.00],
       ],
       AIRTELTIGO: [
-        ["1GB", 4.50, 5.00],
-        ["2GB", 8.50, 9.50],
-        ["3GB", 13.00, 14.00],
-        ["4GB", 17.00, 18.00],
-        ["5GB", 23.00, 24.00]
+          ["1GB", 4.50, 5.00],
+          ["2GB", 8.50, 9.50],
+          ["3GB", 13.00, 14.00],
+          ["4GB", 17.00, 18.00],
+          ["5GB", 23.00, 24.00],
+          ["6GB", 28.00, 29.00],
+          ["7GB", 32.00, 33.00],
+          ["8GB", 41.00, 42.00],
+          ["10GB", 47.00, 48.00],
+          ["12GB", 55.00, 56.00],
+          ["15GB", 72.00, 73.00],
+          ["20GB", 82.00, 83.00],
+          ["25GB", 98.00, 99.00],
+          ["30GB", 128.00, 129.00],
+          ["40GB", 175.00, 176.00],
+          ["50GB", 230.00, 231.00],
+          ["100GB", 440.00, 441.00],
       ]
     };
 
-    const networkSel = document.getElementById('network');
+    // Get references to all form fields and the button
+    const emailInput = document.getElementById('email');
+    const phoneInput = document.getElementById('phone');
+    const recipientInput = document.getElementById('recipient');
+    const payerNetworkSel = document.getElementById('payerNetwork'); 
+    const recipientNetworkSel = document.getElementById('recipientNetwork'); 
+    const deliverySel = document.getElementById('delivery'); // Delivery Type SELECT is now used
     const planSel = document.getElementById('dataplan');
     const amountInput = document.getElementById('amount');
     const payBtn = document.getElementById('payBtn');
     const clearBtn = document.getElementById('clearBtn');
     const messageDiv = document.getElementById('message');
-    const deliverySel = document.getElementById('delivery');
+    // Get overlay elements
+    const overlay = document.getElementById("fullScreenOverlay");
+    const overlayContent = document.getElementById("overlayMessageContent");
 
-    function showMessage(text, type = 'info') {
-      messageDiv.innerHTML = '';
-      const d = document.createElement('div');
-      d.className = 'msg ' + (type === 'success' ? 'success' : (type === 'error' ? 'error' : 'info'));
-      d.textContent = text;
-      messageDiv.appendChild(d);
-    }
-    function clearMessage() { messageDiv.innerHTML = ''; }
+
     function formatPrice(p){ return Number(p).toFixed(2); }
 
+    // MODIFIED showMessage to use the full-screen overlay for 'info'
+    function showMessage(text, type = 'info') {
+      const m = document.getElementById("message");
+      
+      if (type === "info") {
+          // Display message in the full-screen overlay
+          overlayContent.innerHTML = `
+              <div class="spinner"></div>
+              ${text}
+          `;
+          overlay.style.display = 'flex';
+          setTimeout(() => {
+              overlay.style.opacity = '1';
+              document.body.classList.add('lock-scroll');
+          }, 10);
+          m.innerHTML = "";
+
+      } else {
+          // Display error/success message in the standard card location
+          m.innerHTML = "";
+          const div = document.createElement("div");
+          div.textContent = text;
+          div.className = `msg ${type}`; // Use existing CSS for success/error
+          m.appendChild(div);
+          
+          // Hide overlay
+          overlay.style.opacity = '0';
+          document.body.classList.remove('lock-scroll');
+          setTimeout(() => {
+              overlay.style.display = 'none';
+          }, 300);
+      }
+    }
+
+    function clearMessage() { 
+      messageDiv.innerHTML = ''; 
+      // Also clear overlay if visible
+      overlay.style.opacity = '0';
+      document.body.classList.remove('lock-scroll');
+      setTimeout(() => {
+          overlay.style.display = 'none';
+      }, 300);
+    }
+    
+    // FUNCTION: Locks and unlocks the entire form
+    function toggleFormLock(isLocking) {
+        emailInput.readOnly = isLocking;
+        phoneInput.readOnly = isLocking; 
+        recipientInput.readOnly = isLocking; 
+        
+        payerNetworkSel.disabled = isLocking;
+        recipientNetworkSel.disabled = isLocking;
+        deliverySel.disabled = isLocking;
+        planSel.disabled = isLocking;
+
+        payBtn.disabled = isLocking;
+    }
+
+    // FUNCTION: Auto-detect network based on number input
+    function autoDetectNetwork(number, targetSelect) {
+        const trimmedNumber = number.trim();
+        let detectedNetwork = '';
+
+        if (trimmedNumber.length >= 3) {
+            const prefix = trimmedNumber.substring(0, 3);
+            
+            // MTN Prefixes: 024, 025, 053, 054, 055, 059
+            if (['024', '025', '053', '054', '055', '059'].includes(prefix)) {
+                detectedNetwork = 'MTN';
+            // Telecel Prefixes: 020, 050
+            } else if (['020', '050'].includes(prefix)) {
+                detectedNetwork = 'TELECEL';
+            // AirtelTigo Prefixes: 026, 027, 056, 057
+            } else if (['026', '027', '056', '057'].includes(prefix)) {
+                detectedNetwork = 'AIRTELTIGO';
+            }
+        }
+        
+        targetSelect.value = detectedNetwork;
+        
+        // If recipient network changed, update the plans dropdown
+        if (targetSelect === recipientNetworkSel) {
+            populatePlansForNetwork(detectedNetwork);
+        }
+    }
+    
+    // MODIFIED: Populates plan options, showing the delivery price and type in the option text
     function populatePlansForNetwork(network){
       planSel.innerHTML = '';
       amountInput.value = '';
+      const deliveryName = deliverySel.value; // "Normal" or "Express"
+      
       if(!network || !PLANS[network]){
-        planSel.innerHTML = '<option value="">Select a network first</option>';
+        planSel.innerHTML = '<option value="">Select recipient network first</option>';
         planSel.disabled = true;
         return;
       }
@@ -229,67 +408,114 @@
       opt.value = ''; opt.textContent = 'Select Data Plan';
       planSel.appendChild(opt);
 
+      // Determine which price index to use: 1 for Normal, 2 for Express
+      const priceIndex = deliveryName === "Express" ? 2 : 1; 
+
       PLANS[network].forEach(plan=>{
         const [name, normal, express] = plan;
+        const price = plan[priceIndex]; // Get the currently selected price
+        
         const option = document.createElement('option');
-        option.value = JSON.stringify({name:`${network} ${name}`, normal, express});
-        option.textContent = `${name} — GHS ${formatPrice(normal)} / GHS ${formatPrice(express)} (Express)`;
+        // Store name, normal, and express prices for easy lookup in updateAmountFromPlan
+        option.value = JSON.stringify({
+            name:`${network} ${name}`, 
+            normal, 
+            express
+            // The deliveryType is NOT stored here anymore, it's read from deliverySel on submit
+        });
+        // Display the plan name and the merged price/delivery type
+        option.textContent = `${name} — GHS ${formatPrice(price)} (${deliveryName})`;
         planSel.appendChild(option);
       });
+      updateAmountFromPlan();
     }
-
+    
+    // Logic remains the same, calculates price based on deliverySel value
     function updateAmountFromPlan(){
       try{
         const val = planSel.value;
         if(!val){ amountInput.value=''; return; }
         const parsed = JSON.parse(val);
+        // Uses the selected delivery option to choose the price
         const price = deliverySel.value === 'Express' ? parsed.express : parsed.normal;
         amountInput.value = formatPrice(price);
       }catch{ amountInput.value=''; }
     }
 
-    networkSel.addEventListener('change', e => { populatePlansForNetwork(e.target.value); clearMessage(); });
+    // --- EVENT LISTENERS ---
+
+    // Payer Phone: auto-detect Payer's network
+    phoneInput.addEventListener("input", () => autoDetectNetwork(phoneInput.value, payerNetworkSel)); 
+    
+    // Recipient Phone: auto-detect Recipient network
+    recipientInput.addEventListener("input", () => {
+        autoDetectNetwork(recipientInput.value, recipientNetworkSel);
+    });
+
+    // Recipient Network change: populate plans based on the selected network
+    recipientNetworkSel.addEventListener('change', e => { 
+      populatePlansForNetwork(e.target.value); 
+      clearMessage(); 
+    });
+    
+    // Delivery change: re-populate plans (to update display price) and recalculate amount
+    deliverySel.addEventListener('change', ()=>{ 
+      // Repopulating updates the price shown in the Data Plan dropdown options
+      populatePlansForNetwork(recipientNetworkSel.value);
+      clearMessage(); 
+    });
+
     planSel.addEventListener('change', ()=>{ updateAmountFromPlan(); clearMessage(); });
-    deliverySel.addEventListener('change', ()=>{ updateAmountFromPlan(); clearMessage(); });
+    
 
     clearBtn.addEventListener('click', ()=>{
       document.getElementById('checkoutForm').reset();
-      // Manually reset dependent fields
+      // Reset plan dropdown to initial state
       planSel.innerHTML = '<option value="">Select a network first</option>';
       planSel.disabled = true;
       amountInput.value = '';
       clearMessage();
     });
 
+    // --- SUBMIT HANDLER (MODIFIED TO MERGE DATAPLAN AND DELIVERY) ---
+
     document.getElementById('checkoutForm').addEventListener('submit', async e => {
       e.preventDefault(); clearMessage();
-      const email = document.getElementById('email').value.trim();
-      const phone = document.getElementById('phone').value.trim();
-      const recipient = document.getElementById('recipient').value.trim();
-      const network = networkSel.value;
-      const delivery = deliverySel.value;
+      
+      const email = emailInput.value.trim();
+      const phone = phoneInput.value.trim();
+      const recipient = recipientInput.value.trim();
+      const recipientNetwork = recipientNetworkSel.value; 
+      const payerNetwork = payerNetworkSel.value; 
       const planVal = planSel.value;
 
-      // Basic client-side validation
-      if(!phone || !recipient || !network || !planVal) {
+      if(!phone || !recipient || !recipientNetwork || !payerNetwork || !planVal) {
         return showMessage('All required fields must be filled.','error');
       }
 
-      const plan = JSON.parse(planVal);
-      const amount = delivery === 'Express' ? plan.express : plan.normal;
+      const planData = JSON.parse(planVal);
+      // Get the selected delivery type from the visible select field
+      const deliveryType = deliverySel.value; // "Normal" or "Express"
+      
+      // Recalculate final amount based on the selected delivery type
+      const amount = deliveryType === 'Express' ? planData.express : planData.normal; 
+      
+      // *** THE CRITICAL CHANGE: Merge Data Plan Name and Delivery Type ***
+      const mergedDataPlan = `${planData.name} (${deliveryType})`;
 
-      // --- CRITICAL UPDATE: Simplified payload matching backend expectations ---
       const payload = { 
         email, 
         phone, 
         recipient, 
-        dataPlan: plan.name, // e.g., "MTN 5GB"
-        amount: Number(amount) // Ensure amount is sent as a number
+        dataPlan: mergedDataPlan, // Send merged string to backend
+        amount: Number(amount),
+        // The separate 'delivery' field is omitted, fulfilling your request 
+        // that Airtable only uses the 'Data Plan' field.
       };
-      // ------------------------------------------------------------------------
 
-      payBtn.disabled = true; payBtn.textContent = 'Processing...';
-      showMessage('Initiating payment...','info');
+      // NEW UX: Lock the form and show overlay
+      toggleFormLock(true);
+      showMessage('Processing payment request. Please check your phone for the MoMo prompt, do not close tab/window.','info');
 
       try{
         const res = await fetch(BACKEND_URL + '/api/start-checkout', {
@@ -300,34 +526,32 @@
         const data = await res.json();
         
         if(!res.ok) {
-          // Handle server-side errors (e.g., missing Moolre keys, bad request)
-          throw new Error(data.error || 'Failed to start payment due to server error.');
+          throw new Error(data.error || 'Failed to start payment.');
         }
 
-        // The backend returns the payment link directly under 'paymentLink'
         const link = data?.paymentLink; 
 
         if(link){ 
-          showMessage('Redirecting to Moolre...','info'); 
-          // Use a small delay before redirecting
-          setTimeout(()=>window.location.href=link,500);
+          showMessage('Redirecting to Moolre for Payment...','info'); 
+          setTimeout(()=>{
+            toggleFormLock(false); 
+            window.location.href=link;
+          },1000); 
         }
         else {
-          console.error('Moolre response missing payment link:', data);
-          showMessage('Payment initiation succeeded, but no payment link was received. Please check server logs.','error');
+          console.error('No payment link:', data);
+          showMessage('Payment link missing. Check backend logs.','error');
+          toggleFormLock(false);
         }
       }catch(err){
         console.error('Checkout error:', err); 
         showMessage('Error: '+err.message,'error');
-      }finally{
-        payBtn.disabled=false; 
-        payBtn.textContent='Pay';
+        toggleFormLock(false);
       }
     });
 
-    // Initial setup on load
     (function init(){ 
-      populatePlansForNetwork(networkSel.value);
+      populatePlansForNetwork(recipientNetworkSel.value);
     })();
   </script>
 </body>
