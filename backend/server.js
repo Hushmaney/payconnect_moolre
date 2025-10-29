@@ -26,7 +26,8 @@ const MOOLRE_PUBLIC_API_KEY = process.env.MOOLRE_PUBLIC_API_KEY || '';
 const MOOLRE_USERNAME = process.env.MOOLRE_USERNAME || '';
 const MOOLRE_SECRET = process.env.MOOLRE_SECRET || '';
 const MOOLRE_ACCOUNT_NUMBER = process.env.MOOLRE_ACCOUNT_NUMBER || '';
-// ✅ Define the desired final redirect URL here
+// This constant is no longer strictly necessary since the URL is in Moolre settings,
+// but we keep it here as a reminder/reference.
 const FINAL_REDIRECT_URL = 'https://ovaldataafrica.glide.page/'; 
 
 const HUBTEL_CLIENT_ID = process.env.HUBTEL_CLIENT_ID || '';
@@ -146,9 +147,11 @@ app.post('/api/start-checkout', async (req, res) => {
       reusable: false,
       externalref: orderId,
       callback: `${BASE_URL}/api/webhook/moolre`,
-      // ✅ Using 'go' parameter, which is a common alternative for final redirects.
-      // Removed the previous 'return_url' and 'redirect_url' for a clean test.
-      go: FINAL_REDIRECT_URL,
+      // 🛑 REMOVED: 'go', 'return_url', and 'redirect_url'. 
+      // The final redirect is now expected to be handled by the Callback URL
+      // set in the Moolre dashboard (https://ovaldataafrica.glide.page/).
+      // The 'callback' parameter above is for the server-to-server webhook.
+      // ----------------------------------------------------------------------
       // Pass the MERGED dataPlan string to the Moolre metadata
       metadata: { customer_id: phone, dataPlan, recipient } 
     };
