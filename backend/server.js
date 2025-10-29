@@ -26,9 +26,7 @@ const MOOLRE_PUBLIC_API_KEY = process.env.MOOLRE_PUBLIC_API_KEY || '';
 const MOOLRE_USERNAME = process.env.MOOLRE_USERNAME || '';
 const MOOLRE_SECRET = process.env.MOOLRE_SECRET || '';
 const MOOLRE_ACCOUNT_NUMBER = process.env.MOOLRE_ACCOUNT_NUMBER || '';
-// This constant is no longer strictly necessary since the URL is in Moolre settings,
-// but we keep it here as a reminder/reference.
-const FINAL_REDIRECT_URL = 'https://ovaldataafrica.glide.page/'; 
+const FINAL_REDIRECT_URL = 'https://ovaldataafrica.glide.page/'; // UPDATED REDIRECT URL
 
 const HUBTEL_CLIENT_ID = process.env.HUBTEL_CLIENT_ID || '';
 const HUBTEL_CLIENT_SECRET = process.env.HUBTEL_CLIENT_SECRET || '';
@@ -46,7 +44,6 @@ async function airtableRead(externalRef) {
     return null;
   }
   
-  // Construct the URL with a filter formula to search for the unique Order ID
   const url = `https://api.airtable.com/v0/${AIRTABLE_BASE}/${encodeURIComponent(AIRTABLE_TABLE)}?filterByFormula=({Order ID}='${externalRef}')`;
 
   try {
@@ -55,7 +52,6 @@ async function airtableRead(externalRef) {
         Authorization: `Bearer ${AIRTABLE_API_KEY}`,
       }
     });
-    // Return the array of records found
     return res.data.records;
   } catch (err) {
     console.error('Airtable Read API error:', err.response?.data || err.message);
@@ -117,11 +113,8 @@ async function sendHubtelSMS(to, message) {
 // ====== START CHECKOUT (Delivery option merged into dataPlan) ======
 app.post('/api/start-checkout', async (req, res) => {
   try {
-    // Delivery is now expected to be part of dataPlan string in the frontend,
-    // so we don't need a separate field here in the body destructuring.
     const { email, phone, recipient, dataPlan, amount } = req.body; 
 
-    // Validation relies on the frontend sending the merged dataPlan
     if (!phone || !recipient || !dataPlan || !amount) { 
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -147,12 +140,7 @@ app.post('/api/start-checkout', async (req, res) => {
       reusable: false,
       externalref: orderId,
       callback: `${BASE_URL}/api/webhook/moolre`,
-      // 🛑 REMOVED: 'go', 'return_url', and 'redirect_url'. 
-      // The final redirect is now expected to be handled by the Callback URL
-      // set in the Moolre dashboard (https://ovaldataafrica.glide.page/).
-      // The 'callback' parameter above is for the server-to-server webhook.
-      // ----------------------------------------------------------------------
-      // Pass the MERGED dataPlan string to the Moolre metadata
+      redirect: FINAL_REDIRECT_URL, // ADDED REDIRECT
       metadata: { customer_id: phone, dataPlan, recipient } 
     };
 
@@ -187,66 +175,48 @@ app.post('/api/webhook/moolre', async (req, res) => {
     }
 
     const txstatus = Number(data.txstatus || 0);
-    const externalref = data.externalref || ''; // Unique Order ID
+    const externalref = data.externalref || ''; 
     const payerFromMoolre = data.payer || '';
     const metadataPhone = data.metadata?.customer_id || '';
     const customerPhoneRaw = extractNumberFromPayer(payerFromMoolre, metadataPhone);
     const customerPhone = cleanPhoneNumber(customerPhoneRaw);
     
     const amount = data.amount || '';
-    // DataPlan now contains the delivery option (e.g., "MTN 1GB (Express)")
     const dataPlanWithDelivery = data.metadata?.dataPlan || ''; 
     const recipient = data.metadata?.recipient || '';
     
-    // Determine delivery type for SMS based on the combined string
     const isExpress = dataPlanWithDelivery.toLowerCase().includes('(express)');
 
     if (txstatus === 1) {
-      
-      // --- 🚨 IDEMPOTENCY CHECK ---
       const existingRecords = await airtableRead(externalref);
-      if (existingRecords && existingRecords.length > 0) {
-          console.warn(`Duplicate webhook received. Record for Order ID ${externalref} already exists. Skipping.`);
-          // Acknowledge receipt with 200 OK to stop Moolre from retrying.
-          return res.json({ success: true, message: 'Transaction already processed.' });
-      }
-      // --- END IDEMPOTENCY CHECK ---
+      if (existingRecords && existingRecords.length > 0) return res.json({ success: true, message: 'Transaction already processed.' });
 
-      // ✅ Payment successful - DETERMINE SMS TEXT (using merged dataPlan)
-      let smsText;
-      if (isExpress) {
-        smsText = `Your data purchase of ${dataPlanWithDelivery} for ${recipient} has been processed and will be delivered in 5-30 minutes. Order ID: ${externalref}. For support, WhatsApp: 233531300654;`
-      } else {
-        smsText = `Your data purchase of ${dataPlanWithDelivery} for ${recipient} has been processed and will be delivered in 30 minutes to 4 hours. Order ID: ${externalref}. For support, WhatsApp: 233531300654;`
-      }
+      let smsText = isExpress
+        ? `Your data purchase of ${dataPlanWithDelivery} for ${recipient} has been processed and will be delivered in 5-30 minutes. Order ID: ${externalref}. For support, WhatsApp: 233531300654;`
+        : `Your data purchase of ${dataPlanWithDelivery} for ${recipient} has been processed and will be delivered in 30 minutes to 4 hours. Order ID: ${externalref}. For support, WhatsApp: 233531300654;`;
 
       smsResult = await sendHubtelSMS(customerPhone, smsText);
 
-      // ✅ Create Airtable record (Only uses the single Data Plan field)
       const fields = {
         "Order ID": externalref,
         "Customer Phone": customerPhone,
         "Data Recipient Number": recipient,
-        "Data Plan": dataPlanWithDelivery, // Use the merged string for Airtable
+        "Data Plan": dataPlanWithDelivery,
         "Amount": Number(amount),
         "Status": "Pending",
-        // REMOVED "Delivery Option" FIELD
         "Hubtel Sent": smsResult.success,
         "Hubtel Response": JSON.stringify(smsResult.data || smsResult.error || {})
       };
 
       await airtableCreate(fields);
       console.log(`✅ Airtable Record created for Order ID: ${externalref}`);
-      // Return 200 OK after successful processing
       return res.json({ success: true, message: 'SMS sent and Airtable record created' });
     }
 
     console.log(`Payment not successful (Status: ${txstatus}). No action taken.`);
-    // Return 200 OK for non-successful events to clear the webhook queue
     return res.json({ success: true, message: 'Payment not successful' });
   } catch (err) {
     console.error('webhook handler error:', err.message);
-    // Return 200 OK even on internal error to prevent excessive retries
     return res.status(200).json({ success: false, message: 'Internal processing error.' });
   }
 });
