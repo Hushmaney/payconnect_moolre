@@ -144,6 +144,8 @@ app.post('/api/start-checkout', async (req, res) => {
       reusable: false,
       externalref: orderId,
       callback: `${BASE_URL}/api/webhook/moolre`,
+      // ✅ ADDED FINAL REDIRECT LINK HERE
+      return_url: 'https://ovaldataafrica.glide.page/',
       // Pass the MERGED dataPlan string to the Moolre metadata
       metadata: { customer_id: phone, dataPlan, recipient } 
     };
