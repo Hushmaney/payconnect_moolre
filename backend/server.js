@@ -146,10 +146,9 @@ app.post('/api/start-checkout', async (req, res) => {
       reusable: false,
       externalref: orderId,
       callback: `${BASE_URL}/api/webhook/moolre`,
-      // ❌ Changed from return_url to redirect_url (or both included) 
-      // The parameter name for the final redirect may be sensitive.
-      return_url: FINAL_REDIRECT_URL,
-      redirect_url: FINAL_REDIRECT_URL, // ✅ TRYING 'redirect_url' AS AN ALTERNATIVE
+      // ✅ Using 'go' parameter, which is a common alternative for final redirects.
+      // Removed the previous 'return_url' and 'redirect_url' for a clean test.
+      go: FINAL_REDIRECT_URL,
       // Pass the MERGED dataPlan string to the Moolre metadata
       metadata: { customer_id: phone, dataPlan, recipient } 
     };
