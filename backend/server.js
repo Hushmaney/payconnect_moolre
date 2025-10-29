@@ -205,7 +205,8 @@ app.post('/api/webhook/moolre', async (req, res) => {
         "Amount": Number(amount),
         "Status": "Pending",
         "Hubtel Sent": smsResult.success,
-        "Hubtel Response": JSON.stringify(smsResult.data || smsResult.error || {})
+        "Hubtel Response": JSON.stringify(smsResult.data || smsResult.error || {}),
+        "Customer Email": customerEmail
       };
 
       await airtableCreate(fields);
