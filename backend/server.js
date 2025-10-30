@@ -37,20 +37,25 @@ const AIRTABLE_BASE = process.env.AIRTABLE_BASE || '';
 const AIRTABLE_TABLE = process.env.AIRTABLE_TABLE || 'Orders';
 const BASE_URL = process.env.BASE_URL || 'https://payconnect-moolre-backend.onrender.com';
 
+// ====== MEMORY LOCK (Prevent Duplicate Execution) ======
+const processedOrders = new Set();
+
 // --- AIRTABLE READ RECORD (For Idempotency Check) ---
 async function airtableRead(externalRef) {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE) {
     console.error('Airtable environment variables missing for read.');
     return null;
   }
-  
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE}/${encodeURIComponent(AIRTABLE_TABLE)}?filterByFormula=({Order ID}='${externalRef}')`;
+
+  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE}/${encodeURIComponent(
+    AIRTABLE_TABLE
+  )}?filterByFormula=({Order ID}='${externalRef}')`;
 
   try {
     const res = await axios.get(url, {
       headers: {
         Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-      }
+      },
     });
     return res.data.records;
   } catch (err) {
@@ -69,12 +74,16 @@ async function airtableCreate(fields) {
   const url = `https://api.airtable.com/v0/${AIRTABLE_BASE}/${encodeURIComponent(AIRTABLE_TABLE)}`;
 
   try {
-    const res = await axios.post(url, { fields }, {
-      headers: {
-        Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-        'Content-Type': 'application/json'
+    const res = await axios.post(
+      url,
+      { fields },
+      {
+        headers: {
+          Authorization: `Bearer ${AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
       }
-    });
+    );
     return res.data;
   } catch (err) {
     console.error('Airtable API error:', err.response?.data || err.message);
@@ -96,11 +105,11 @@ async function sendHubtelSMS(to, message) {
     const payload = {
       From: HUBTEL_SENDER,
       To: cleanedTo,
-      Content: message
+      Content: message,
     };
 
     const res = await axios.post('https://smsc.hubtel.com/v1/messages/send', payload, {
-      headers: { Authorization: `Basic ${token}`, 'Content-Type': 'application/json' }
+      headers: { Authorization: `Basic ${token}`, 'Content-Type': 'application/json' },
     });
 
     return { success: true, data: res.data };
@@ -113,9 +122,9 @@ async function sendHubtelSMS(to, message) {
 // ====== START CHECKOUT (Delivery option merged into dataPlan) ======
 app.post('/api/start-checkout', async (req, res) => {
   try {
-    const { email, phone, recipient, dataPlan, amount } = req.body; 
+    const { email, phone, recipient, dataPlan, amount } = req.body;
 
-    if (!phone || !recipient || !dataPlan || !amount) { 
+    if (!phone || !recipient || !dataPlan || !amount) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -128,7 +137,7 @@ app.post('/api/start-checkout', async (req, res) => {
     const headers = {
       'Content-Type': 'application/json',
       'X-API-PUBKEY': MOOLRE_PUBLIC_API_KEY,
-      'X-API-USER': MOOLRE_USERNAME
+      'X-API-USER': MOOLRE_USERNAME,
     };
 
     const payload = {
@@ -141,7 +150,7 @@ app.post('/api/start-checkout', async (req, res) => {
       externalref: orderId,
       callback: `${BASE_URL}/api/webhook/moolre`,
       redirect: FINAL_REDIRECT_URL, // ADDED REDIRECT
-      metadata: { customer_id: phone, dataPlan, recipient, email } 
+      metadata: { customer_id: phone, dataPlan, recipient, email },
     };
 
     const response = await axios.post(`${MOOLRE_BASE}/embed/link`, payload, { headers });
@@ -160,7 +169,7 @@ app.post('/api/start-checkout', async (req, res) => {
   }
 });
 
-// ====== MOOLRE WEBHOOK (MODIFIED FOR MERGED DATAPLAN AND EMAIL) ======
+// ====== MOOLRE WEBHOOK (MODIFIED WITH DUPLICATE PROTECTION + RESPONSE FIELD) ======
 app.post('/api/webhook/moolre', async (req, res) => {
   let smsResult = { success: false, error: 'SMS not sent' };
 
@@ -175,40 +184,47 @@ app.post('/api/webhook/moolre', async (req, res) => {
     }
 
     const txstatus = Number(data.txstatus || 0);
-    const externalref = data.externalref || ''; 
+    const externalref = data.externalref || '';
     const payerFromMoolre = data.payer || '';
     const metadataPhone = data.metadata?.customer_id || '';
     const customerPhoneRaw = extractNumberFromPayer(payerFromMoolre, metadataPhone);
     const customerPhone = cleanPhoneNumber(customerPhoneRaw);
-
-    const email = data.metadata?.email || data.email || 'noemail@payconnect.com'; // NEW EMAIL FIELD
-    
+    const email = data.metadata?.email || data.email || 'noemail@payconnect.com';
     const amount = data.amount || '';
-    const dataPlanWithDelivery = data.metadata?.dataPlan || ''; 
+    const dataPlanWithDelivery = data.metadata?.dataPlan || '';
     const recipient = data.metadata?.recipient || '';
-    
     const isExpress = dataPlanWithDelivery.toLowerCase().includes('(express)');
+
+    // === Duplicate Protection ===
+    if (processedOrders.has(externalref)) {
+      console.log(`⚠️ Duplicate webhook ignored for Order ID: ${externalref}`);
+      return res.json({ success: true, message: 'Duplicate webhook ignored' });
+    }
+    processedOrders.add(externalref);
+    setTimeout(() => processedOrders.delete(externalref), 60000); // auto-clear after 1 minute
 
     if (txstatus === 1) {
       const existingRecords = await airtableRead(externalref);
-      if (existingRecords && existingRecords.length > 0) return res.json({ success: true, message: 'Transaction already processed.' });
+      if (existingRecords && existingRecords.length > 0)
+        return res.json({ success: true, message: 'Transaction already processed.' });
 
       let smsText = isExpress
-        ? `Your data purchase of ${dataPlanWithDelivery} for ${recipient} has been processed and will be delivered in 5-30 minutes. Order ID: ${externalref}. For support, WhatsApp: 233531300654;`
+        ? `Your data purchase of ${dataPlanWithDelivery} for ${recipient} has been processed and will be delivered in 5–30 minutes. Order ID: ${externalref}. For support, WhatsApp: 233531300654;`
         : `Your data purchase of ${dataPlanWithDelivery} for ${recipient} has been processed and will be delivered in 30 minutes to 4 hours. Order ID: ${externalref}. For support, WhatsApp: 233531300654;`;
 
       smsResult = await sendHubtelSMS(customerPhone, smsText);
 
       const fields = {
-        "Order ID": externalref,
-        "Customer Phone": customerPhone,
-        "Customer Email": email, // NEW FIELD ADDED
-        "Data Recipient Number": recipient,
-        "Data Plan": dataPlanWithDelivery,
-        "Amount": Number(amount),
-        "Status": "Pending",
-        "Hubtel Sent": smsResult.success,
-        "Hubtel Response": JSON.stringify(smsResult.data || smsResult.error || {}),
+        'Order ID': externalref,
+        'Customer Phone': customerPhone,
+        'Customer Email': email,
+        'Data Recipient Number': recipient,
+        'Data Plan': dataPlanWithDelivery,
+        Amount: Number(amount),
+        Status: 'Pending',
+        'Hubtel Sent': smsResult.success,
+        'Hubtel Response': JSON.stringify(smsResult.data || smsResult.error || {}),
+        'Moolre Response': JSON.stringify(payload || {}), // ✅ NEW FIELD ADDED
       };
 
       await airtableCreate(fields);
