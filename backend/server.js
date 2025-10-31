@@ -119,7 +119,7 @@ async function sendHubtelSMS(to, message) {
   }
 }
 
-// ====== START CHECKOUT (Delivery option merged into dataPlan) ======
+// ====== START CHECKOUT ======
 app.post('/api/start-checkout', async (req, res) => {
   try {
     const { email, phone, recipient, dataPlan, amount } = req.body;
@@ -149,7 +149,7 @@ app.post('/api/start-checkout', async (req, res) => {
       reusable: false,
       externalref: orderId,
       callback: `${BASE_URL}/api/webhook/moolre`,
-      redirect: FINAL_REDIRECT_URL, // ADDED REDIRECT
+      redirect: FINAL_REDIRECT_URL,
       metadata: { customer_id: phone, dataPlan, recipient, email },
     };
 
@@ -169,7 +169,7 @@ app.post('/api/start-checkout', async (req, res) => {
   }
 });
 
-// ====== MOOLRE WEBHOOK (MODIFIED WITH DUPLICATE PROTECTION + RESPONSE FIELD) ======
+// ====== MOOLRE WEBHOOK ======
 app.post('/api/webhook/moolre', async (req, res) => {
   let smsResult = { success: false, error: 'SMS not sent' };
 
@@ -201,7 +201,7 @@ app.post('/api/webhook/moolre', async (req, res) => {
       return res.json({ success: true, message: 'Duplicate webhook ignored' });
     }
     processedOrders.add(externalref);
-    setTimeout(() => processedOrders.delete(externalref), 60000); // auto-clear after 1 minute
+    setTimeout(() => processedOrders.delete(externalref), 60000);
 
     if (txstatus === 1) {
       const existingRecords = await airtableRead(externalref);
@@ -224,7 +224,7 @@ app.post('/api/webhook/moolre', async (req, res) => {
         Status: 'Pending',
         'Hubtel Sent': smsResult.success,
         'Hubtel Response': JSON.stringify(smsResult.data || smsResult.error || {}),
-        'Moolre Response': JSON.stringify(payload || {}), // ✅ NEW FIELD ADDED
+        'Moolre Response': JSON.stringify(payload || {}),
       };
 
       await airtableCreate(fields);
@@ -240,11 +240,31 @@ app.post('/api/webhook/moolre', async (req, res) => {
   }
 });
 
+// ====== HOMEPAGE ======
+app.get('/', (req, res) => {
+  res.send(`
+    <h1>✅ Payconnect Moolre Backend</h1>
+    <p>Your backend is running successfully.</p>
+    <p>Try <a href="/api/test">/api/test</a> to confirm API status.</p>
+  `);
+});
+
 // ====== TEST ROUTE ======
 app.get('/api/test', (req, res) => {
   res.json({ message: '✅ Payconnect Moolre backend is live!' });
 });
 
+// ====== HEALTH CHECK (New) ======
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() });
+});
+
+// ====== FALLBACK FOR UNKNOWN ROUTES ======
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
+});
+
+// ====== START SERVER ======
 app.listen(PORT, () => {
   console.log(`✅ Payconnect Moolre backend running on port ${PORT}`);
 });
