@@ -26,7 +26,7 @@ const MOOLRE_PUBLIC_API_KEY = process.env.MOOLRE_PUBLIC_API_KEY || '';
 const MOOLRE_USERNAME = process.env.MOOLRE_USERNAME || '';
 const MOOLRE_SECRET = process.env.MOOLRE_SECRET || '';
 const MOOLRE_ACCOUNT_NUMBER = process.env.MOOLRE_ACCOUNT_NUMBER || '';
-const FINAL_REDIRECT_URL = 'https://ovaldataafrica.glide.page/';
+const FINAL_REDIRECT_URL = 'https://ovaldataafrica.glide.page/'; 
 
 const HUBTEL_CLIENT_ID = process.env.HUBTEL_CLIENT_ID || '';
 const HUBTEL_CLIENT_SECRET = process.env.HUBTEL_CLIENT_SECRET || '';
@@ -41,16 +41,14 @@ const BASE_URL = process.env.BASE_URL || 'https://payconnect-moolre-backend.onre
 const processedOrders = new Set();
 // Store pending transactions that are awaiting OTP submission
 const pendingTransactions = new Map();
-// Store confirmed transactions for status polling
-const confirmedTransactions = new Map();
 
 // Helper to determine the Moolre Channel ID based on the phone number/network
 function getChannelId(payerNumber) {
-  const firstThree = payerNumber.substring(0, 3);
-  if (firstThree.includes('24') || firstThree.includes('54') || firstThree.includes('55')) return 13; // MTN
-  if (firstThree.includes('20') || firstThree.includes('50')) return 6; // Vodafone
-  if (firstThree.includes('26') || firstThree.includes('56')) return 7; // AirtelTigo
-  return 13;
+    const firstThree = payerNumber.substring(0, 3);
+    if (firstThree.includes('24') || firstThree.includes('54') || firstThree.includes('55')) return 13; // MTN
+    if (firstThree.includes('20') || firstThree.includes('50')) return 6; // Vodafone
+    if (firstThree.includes('26') || firstThree.includes('56')) return 7; // AirtelTigo
+    return 13; 
 }
 
 // --- AIRTABLE READ RECORD ---
@@ -104,36 +102,6 @@ async function airtableCreate(fields) {
   }
 }
 
-// ====== NEW: AIRTABLE UPDATE RECORD (Added for completeness/future use) ======
-async function airtableUpdate(recordId, fields) {
-  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE) {
-    console.error('Airtable environment variables missing for update.');
-    throw new Error('Airtable configuration missing.');
-  }
-
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE}/${encodeURIComponent(AIRTABLE_TABLE)}`;
-
-  try {
-    // Send a PATCH request to update the specific record
-    const res = await axios.patch(
-      url,
-      { records: [{ id: recordId, fields: fields }] },
-      {
-        headers: {
-          Authorization: `Bearer ${AIRTABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-    return res.data;
-  } catch (err) {
-    console.error('Airtable Update API error:', err.response?.data || err.message);
-    // Do not re-throw error to avoid crashing the webhook, just log it.
-    console.error(`Failed to update Airtable record ${recordId}.`);
-    return null;
-  }
-}
-
 // ====== HUBTEL SMS ======
 async function sendHubtelSMS(to, message) {
   try {
@@ -180,13 +148,13 @@ app.post('/api/momo-payment', async (req, res) => {
 
     const headers = {
       'Content-Type': 'application/json',
-      'X-API-PUBKEY': MOOLRE_PUBLIC_API_KEY,
+      'X-API-PUBKEY': MOOLRE_PUBLIC_API_KEY, 
       'X-API-USER': MOOLRE_USERNAME,
     };
 
     const payload = {
       type: 1,
-      channel: channel,
+      channel: channel, 
       currency: 'GHS',
       payer: payer,
       amount: String(Number(amount).toFixed(2)),
@@ -211,42 +179,42 @@ app.post('/api/momo-payment', async (req, res) => {
 
     // --- STEP 1: INITIAL REQUEST (Trigger OTP) ---
     if (!otpcode) {
-      if (responseCode === 'TP14') {
-        // Store sessionid for OTP verification
-        pendingTransactions.set(orderId, { ...payload, ...metadata, sessionid: moolreData.sessionid || '' });
-        console.log(`Payment started for ${orderId}. Awaiting OTP.`);
-        return res.json({ success: true, orderId: orderId, status: 'OTP_REQUIRED', message: moolreData.message });
-      }
+        if (responseCode === 'TP14') {
+            // Store sessionid for OTP verification
+            pendingTransactions.set(orderId, { ...payload, ...metadata, sessionid: moolreData.sessionid || '' });
+            console.log(`Payment started for ${orderId}. Awaiting OTP.`);
+            return res.json({ success: true, orderId: orderId, status: 'OTP_REQUIRED', message: moolreData.message });
+        }
 
-      if (isSuccess) {
-        console.log(`Payment started for ${orderId}. MoMo prompt sent directly.`);
-        return res.json({ success: true, orderId: orderId, status: 'PROMPT_SENT', message: moolreData.message });
-      }
+        if (isSuccess) {
+            console.log(`Payment started for ${orderId}. MoMo prompt sent directly.`);
+            return res.json({ success: true, orderId: orderId, status: 'PROMPT_SENT', message: moolreData.message });
+        }
     }
 
     // --- STEP 2: OTP SUBMISSION & FINAL PROMPT ---
     if (otpcode) {
-      const temp = pendingTransactions.get(orderId);
-      if (temp && temp.sessionid) payload.sessionid = temp.sessionid;
+        const temp = pendingTransactions.get(orderId);
+        if (temp && temp.sessionid) payload.sessionid = temp.sessionid;
 
-      let otpResponse;
-      try {
-        otpResponse = await axios.post(`${MOOLRE_BASE}/open/transact/payment`, payload, { headers });
-      } catch (err) {
-        const errorData = err.response?.data || err.message;
-        console.error('Moolre OTP verify error:', errorData);
-        return res.status(502).json({ success: false, error: 'Moolre OTP verify failed', details: errorData });
-      }
+        let otpResponse;
+        try {
+          otpResponse = await axios.post(`${MOOLRE_BASE}/open/transact/payment`, payload, { headers });
+        } catch (err) {
+          const errorData = err.response?.data || err.message;
+          console.error('Moolre OTP verify error:', errorData);
+          return res.status(502).json({ success: false, error: 'Moolre OTP verify failed', details: errorData });
+        }
 
-      const otpData = otpResponse.data;
-      if (otpData.status === 1) {
-        pendingTransactions.delete(orderId);
-        console.log(`Payment verified for ${orderId}. Final MoMo prompt sent.`);
-        return res.json({ success: true, orderId: orderId, status: 'VERIFIED_AND_PROMPT_SENT', message: otpData.message });
-      } else {
-        console.log(`OTP verification failed for ${orderId}. Code: ${otpData.code}`);
-        return res.status(400).json({ success: false, orderId: orderId, status: 'OTP_FAILED', message: otpData.message });
-      }
+        const otpData = otpResponse.data;
+        if (otpData.status === 1) {
+            pendingTransactions.delete(orderId);
+            console.log(`Payment verified for ${orderId}. Final MoMo prompt sent.`);
+            return res.json({ success: true, orderId: orderId, status: 'VERIFIED_AND_PROMPT_SENT', message: otpData.message });
+        } else {
+            console.log(`OTP verification failed for ${orderId}. Code: ${otpData.code}`);
+            return res.status(400).json({ success: false, orderId: orderId, status: 'OTP_FAILED', message: otpData.message });
+        }
     }
 
     console.error('Unexpected Moolre Response:', JSON.stringify(moolreData, null, 2));
@@ -259,40 +227,7 @@ app.post('/api/momo-payment', async (req, res) => {
 });
 
 // ===========================================
-//  PAYMENT STATUS POLLING ENDPOINT
-//  (Supports confirmation.html)
-// ===========================================
-app.get('/api/payment-status', async (req, res) => {
-  const { orderId } = req.query;
-  if (!orderId) return res.status(400).json({ success: false, error: 'Missing orderId query parameter' });
-
-  try {
-    // 1. Check if transaction has been confirmed via webhook (in-memory)
-    if (confirmedTransactions.has(orderId)) {
-      console.log(`Status Check: CONFIRMED (in-memory) for ${orderId}`);
-      return res.json({ success: true, status: 'CONFIRMED' });
-    }
-
-    // 2. Check Airtable for fallback confirmation (if server restarted or webhook was slow)
-    // The webhook creates a record, so checking for its existence acts as confirmation.
-    const records = await airtableRead(orderId);
-    if (records && records.length > 0) {
-      confirmedTransactions.set(orderId, true); // Cache for faster subsequent checks
-      console.log(`Status Check: CONFIRMED (Airtable fallback) for ${orderId}`);
-      return res.json({ success: true, status: 'CONFIRMED' });
-    }
-
-    console.log(`Status Check: PENDING for ${orderId}`);
-    return res.json({ success: true, status: 'PENDING' });
-  } catch (err) {
-    console.error('Payment status check error:', err.message);
-    return res.status(500).json({ success: false, error: 'Server error checking payment status' });
-  }
-});
-
-// ===========================================
-//  MOOLRE WEBHOOK
-//  (Triggers SMS & Airtable, sets confirmedTransactions)
+//  MOOLRE WEBHOOK (No Changes Needed)
 // ===========================================
 app.post('/api/webhook/moolre', async (req, res) => {
   let smsResult = { success: false, error: 'SMS not sent' };
@@ -310,22 +245,21 @@ app.post('/api/webhook/moolre', async (req, res) => {
     const txstatus = Number(data.txstatus || 0);
     const externalref = data.externalref || '';
     const payerFromMoolre = data.payer || '';
-    const metadataPhone = data.metadata?.customer_id || '';
-
+    const metadataPhone = data.metadata?.customer_id || ''; 
+    
     const customerPhoneRaw = extractNumberFromPayer(payerFromMoolre, metadataPhone);
     const customerPhone = cleanPhoneNumber(customerPhoneRaw);
-
+    
     const amount = data.amount || '';
     let dataPlanWithDelivery = 'N/A - Check Airtable/DB';
     let recipient = 'N/A - Check Airtable/DB';
     let email = 'N/A - Check Airtable/DB';
-
+    
     const tempTransaction = pendingTransactions.get(externalref);
-    if (tempTransaction) {
-      dataPlanWithDelivery = tempTransaction.dataPlan || dataPlanWithDelivery;
-      recipient = tempTransaction.recipient || recipient;
-      email = tempTransaction.email || email;
-      pendingTransactions.delete(externalref); // Clean up temp memory
+    if(tempTransaction) {
+        dataPlanWithDelivery = tempTransaction.dataPlan || dataPlanWithDelivery;
+        recipient = tempTransaction.recipient || recipient;
+        email = tempTransaction.email || email;
     }
 
     const isExpress = dataPlanWithDelivery.toLowerCase().includes('(express)');
@@ -355,15 +289,14 @@ app.post('/api/webhook/moolre', async (req, res) => {
         'Data Recipient Number': recipient,
         'Data Plan': dataPlanWithDelivery,
         Amount: Number(amount),
-        Status: 'Pending', // Status is Pending until data is actually delivered by you
+        Status: 'Pending',
         'Hubtel Sent': smsResult.success,
         'Hubtel Response': JSON.stringify(smsResult.data || smsResult.error || {}),
         'Moolre Response': JSON.stringify(payload || {}),
       };
 
       await airtableCreate(fields);
-      confirmedTransactions.set(externalref, true); // <--- CRITICAL for confirmation.html polling
-      console.log(`✅ Airtable Record created and CONFIRMED in memory for Order ID: ${externalref}`);
+      console.log(`✅ Airtable Record created for Order ID: ${externalref}`);
       return res.json({ success: true, message: 'SMS sent and Airtable record created' });
     }
 
