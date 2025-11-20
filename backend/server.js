@@ -272,10 +272,20 @@ app.post('/api/webhook/moolre', async (req, res) => {
     const data = payload.data || {};
     const incomingSecret = data.secret || payload.secret || '';
 
+    // ⚠️ TEMPORARY DEBUGGING: LOG THE SECRET INSTEAD OF FAILING ⚠️
+    // You MUST remove this block after capturing the secret!
     if (incomingSecret !== MOOLRE_SECRET) {
-      console.warn('Invalid webhook secret');
-      return res.status(401).json({ error: 'Invalid secret' });
-    }
+      console.warn('⚠️ WEBHOOK SECRET MISMATCH DETECTED!');
+      console.warn('Your Server Secret (MOOLRE_SECRET):', MOOLRE_SECRET);
+      console.warn('Moolre Incoming Secret:', incomingSecret); 
+    } 
+    // END OF DEBUG BLOCK
+
+    // This is the original security check, which we are temporarily bypassing:
+    // if (incomingSecret !== MOOLRE_SECRET) {
+    //   console.warn('Invalid webhook secret');
+    //   return res.status(401).json({ error: 'Invalid secret' });
+    // }
 
     const txstatus = Number(data.txstatus || 0);
     const externalref = data.externalref || '';
