@@ -318,7 +318,7 @@ app.post('/api/webhook/moolre', async (req, res) => {
         return res.status(200).json({ success: true, message: 'Transaction already processed.' });
 
       let smsText = isExpress
-        ? `Your data purchase of ${dataPlanWithDelivery} for ${recipient} has been processed and will be delivered in 5–30 minutes. Order ID: ${externalref}. For support, WhatsApp: 233531300654;`
+        ? `Your data purchase of ${dataPlanWithDelivery} for ${recipient} has been processed and will be delivered in 5 to 30 minutes. Order ID: ${externalref}. For support, WhatsApp: 233531300654;`
         : `Your data purchase of ${dataPlanWithDelivery} for ${recipient} has been processed and will be delivered in 30 minutes to 4 hours. Order ID: ${externalref}. For support, WhatsApp: 233531300654;`;
 
       // 1. Send SMS

@@ -137,11 +137,16 @@
   <script>
     const BACKEND_URL = "https://payconnect-moolre-backend.onrender.com";
     const PAYMENT_ENDPOINT = `${BACKEND_URL}/api/momo-payment`;
+    const STATUS_ENDPOINT = `${BACKEND_URL}/api/payment-status`;
+    const FINAL_REDIRECT_URL = 'https://ovaldataafrica.glide.page/';
+    const MIN_DELAY_MS = 2000; // 2 seconds minimum display time for fast operations
 
     let currentOrderId = null;
+    const POLL_INTERVAL = 3000;
+    const MAX_ATTEMPTS = 30;
 
     const PLANS = {
-      MTN: [["1GB",1,1],["2GB",11,13],["3GB",15.5,17],["4GB",21,23],["5GB",25,27],["6GB",32,35],["8GB",40,42],["10GB",50,52],["15GB",72,74],["20GB",87,89],["25GB",110,112],["30GB",135,137],["40GB",175,177],["50GB",210,212],["100GB",405,407]],
+      MTN: [["1GB",5.50,7],["2GB",11,13],["3GB",15.5,17],["4GB",21,23],["5GB",25,27],["6GB",32,35],["8GB",40,42],["10GB",50,52],["15GB",72,74],["20GB",87,89],["25GB",110,112],["30GB",135,137],["40GB",175,177],["50GB",210,212],["100GB",405,407]],
       TELECEL: [["5GB",24,27],["10GB",44,47],["15GB",63,65],["20GB",83,85],["25GB",101,103],["30GB",121,122],["35GB",150,152],["40GB",161,163],["45GB",190,192],["50GB",202,204],["100GB",375,377]],
       AIRTELTIGO: [["1GB",4.5,5],["2GB",8.5,9.5],["3GB",13,14],["4GB",17,18],["5GB",23,24],["6GB",28,29],["7GB",32,33],["8GB",41,42],["10GB",47,48],["12GB",55,56],["15GB",72,73],["20GB",82,83],["25GB",98,99],["30GB",128,129],["40GB",175,176],["50GB",230,231],["100GB",440,441]]
     };
@@ -163,54 +168,109 @@
     const otpInput=document.getElementById('otpcode');
     const paymentInstruction=document.getElementById('paymentInstruction');
 
+    // Utility function to enforce a minimum delay
+    function delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
     function formatPrice(p){return Number(p).toFixed(2);}
-    function dismissOverlay(){
+
+    function showMessage(text,type='info'){
+      // We only clear the inline message here, but we check if the overlay is already active
+      // to avoid unnecessary re-hiding/re-showing if a different message type is requested.
+      if (type === 'error' || type === 'success') {
+          dismissOverlay(); 
+      }
+      messageDiv.innerHTML='';
+      
+      if(type==='info' || type==='success-poll' || type==='success-redirect'){
+        overlayContent.innerHTML=`<div class="spinner"></div>${text}`;
+        overlay.style.display='flex';
+        setTimeout(()=>{overlay.style.opacity='1'; document.body.classList.add('lock-scroll');},10);
+      }else{
+        const div=document.createElement('div'); div.textContent=text; div.className=`msg ${type}`;
+        messageDiv.appendChild(div);
+      }
+    }
+    
+    function dismissOverlay(){ 
       overlay.style.opacity='0';
       document.body.classList.remove('lock-scroll');
       setTimeout(()=>{overlay.style.display='none';},300);
     }
     
-    function showMessage(text,type='info'){
-      messageDiv.innerHTML=''; // Always clear inline message when starting a new message
-      if(type==='info'){
-        // Use the overlay for 'info' and processing states
-        overlayContent.innerHTML=`<div class="spinner"></div>${text}`;
-        overlay.style.display='flex';
-        // Use a slight timeout to ensure display:flex is applied before setting opacity
-        setTimeout(() => {
-          overlay.style.opacity='1';
-          document.body.classList.add('lock-scroll');
-        }, 10);
-      }else{
-        // Use the inline div for success/error
-        dismissOverlay();
-        const div=document.createElement('div'); div.textContent=text; div.className=`msg ${type}`;
-        messageDiv.appendChild(div);
-      }
-    }
     function clearMessage(){ dismissOverlay(); messageDiv.innerHTML='';}
 
     function toggleFormLock(isLocking){
       emailInput.readOnly=isLocking; phoneInput.readOnly=isLocking; recipientInput.readOnly=isLocking;
       payerNetworkSel.disabled=isLocking; recipientNetworkSel.disabled=isLocking;
-      deliverySel.disabled=isLocking; planSel.disabled=isLocking; payBtn.disabled=isLocking; clearBtn.disabled=isLocking;
-      // Ensure OTP input and button are handled separately during the OTP phase
-      if (!isLocking) {
-        otpInput.readOnly = false;
-        payBtn.disabled = false;
-      }
+      deliverySel.disabled=isLocking; planSel.disabled=isLocking; 
     }
     
     function resetPaymentForm(){ 
       currentOrderId=null; 
       otpInput.value=''; 
       otpSection.style.display='none'; 
-      otpInput.removeAttribute('required'); // Remove required attribute when hidden
+      otpInput.removeAttribute('required');
       payBtn.textContent='Pay'; 
+      payBtn.disabled=false;
+      clearBtn.disabled=false;
       paymentInstruction.innerHTML='After clicking **Pay**, we will send an OTP to your phone to confirm the MoMo number.'; 
       toggleFormLock(false); 
       clearMessage();
     }
+
+    async function pollPaymentStatus(orderId, phone, amountFormatted, attempts = 0) {
+        if (attempts >= MAX_ATTEMPTS) {
+            dismissOverlay();
+            showMessage('Payment confirmation timed out. Please check your phone for the MoMo message and contact support with your Order ID: ' + orderId, 'error');
+            resetPaymentForm();
+            return;
+        }
+        
+        // Always display the stable polling message at the start of each check
+        const pollMessage = `
+            Confirming Payment! A Mobile Money prompt has been sent to 
+            **${phone}**. Please enter your **PIN** on your phone to complete the payment of 
+            **GHS ${amountFormatted}**. We are waiting for confirmation (Attempt ${attempts + 1}/${MAX_ATTEMPTS})...
+        `;
+        // Ensure the overlay is visible and the message is updated to keep the spinner running
+        showMessage(pollMessage,'success-poll');
+
+        try {
+            const response = await fetch(`${STATUS_ENDPOINT}?orderId=${orderId}`);
+            const data = await response.json();
+
+            if (data.status === 'CONFIRMED') {
+                console.log("Payment confirmed. Redirecting...");
+                
+                // FINAL SUCCESS MESSAGE BEFORE REDIRECT
+                const finalSuccessMessage = `
+                    <div class="spinner" style="border-top: 4px solid var(--success); border-color: rgba(6,95,70,0.2);"></div>
+                    <span style="color: var(--success);">Payment Successful!</span> Your order has been processed. Thank you for your purchase...
+                `;
+                showMessage(finalSuccessMessage,'success-redirect');
+                
+                // Redirect after a slight delay
+                setTimeout(() => {
+                    window.location.href = FINAL_REDIRECT_URL;
+                }, 2000); 
+                return;
+            }
+
+            // If status is PENDING, try again after interval
+            setTimeout(() => {
+                pollPaymentStatus(orderId, phone, amountFormatted, attempts + 1);
+            }, POLL_INTERVAL);
+
+        } catch (error) {
+            dismissOverlay();
+            console.error("Error during polling:", error);
+            showMessage('A network error occurred while confirming payment. Please check your phone for the MoMo message.', 'error');
+            resetPaymentForm();
+        }
+    }
+
 
     function autoDetectNetwork(number,targetSelect){
       const trimmed=(number||'').trim(); let detected='';
@@ -233,7 +293,6 @@
       PLANS[network].forEach(([name,normal,express])=>{
         const price=priceIndex===2?express:normal;
         const opt=document.createElement('option');
-        // Store the full plan details as a JSON string
         opt.value=JSON.stringify({name:`${network} ${name}`, normal, express});
         opt.textContent=`${name} — GHS ${formatPrice(price)} (${deliveryName})`;
         planSel.appendChild(opt);
@@ -271,7 +330,7 @@
       let planData; try{ planData=JSON.parse(planVal);}catch(err){return showMessage('Invalid data plan selected.','error');}
       const deliveryType=deliverySel.value;
       const amount=deliveryType==='Express'?planData.express:planData.normal;
-      // This is the formatted string used in the SMS and Airtable
+      const amountFormatted = formatPrice(amount);
       const mergedDataPlan=`${planData.name} (${deliveryType})`;
 
       const payload={
@@ -288,45 +347,57 @@
 
       if(!isInitialRequest && currentOrderId && otpcode.length!==6) return showMessage('Please enter the 6-digit OTP received via SMS.','error');
 
-      // Lock all fields except OTP input during the OTP stage
+      // Lock ALL fields and buttons (except clear) while payment is processing
       toggleFormLock(true);
+      payBtn.disabled=true;
+      clearBtn.disabled=true;
       
+      const startTime = Date.now(); // Start timer for minimum delay
+
       if(isInitialRequest){ 
         showMessage('Requesting Mobile Money Payment. Please wait for an SMS OTP...','info'); 
       }
       else{ 
         otpInput.readOnly=true; 
-        payBtn.textContent='Verifying...'; 
         showMessage('Verifying OTP and sending final MoMo prompt...','info'); 
       }
 
       try{
-        const res=await fetch(PAYMENT_ENDPOINT,{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+        const [res] = await Promise.all([
+            fetch(PAYMENT_ENDPOINT,{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)}),
+            // Enforce minimum display time for the spinner
+            delay(MIN_DELAY_MS - (Date.now() - startTime)) 
+        ]);
+        
         const data=await res.json().catch(()=>({}));
 
         if(!res.ok||data.success===false) throw new Error(data.message||data.error||`Server returned ${res.status}`);
 
         if(data.status==='OTP_REQUIRED'){
           currentOrderId=data.orderId;
-          clearMessage();
-          // Unlock only the OTP related fields
+          dismissOverlay(); 
+          
           toggleFormLock(true); 
           otpSection.style.display='grid';
-          otpInput.setAttribute('required', 'required'); // Add required attribute for validation
+          otpInput.setAttribute('required', 'required'); 
           otpInput.readOnly=false;
+          
           payBtn.disabled=false;
           payBtn.textContent='Verify & Pay';
+          clearBtn.disabled=false; 
+          
           paymentInstruction.innerHTML='Enter the **6-digit OTP** sent to your phone to verify the number and initiate the MoMo prompt.';
-          showMessage(data.message || 'OTP has been sent to your phone. Please enter it below to proceed.','info');
+          
+          messageDiv.innerHTML = `<div class="msg info">OTP has been sent to your phone. Please enter it below to proceed.</div>`;
           otpInput.focus();
           return;
         }
 
         if(data.status==='PROMPT_SENT'||data.status==='VERIFIED_AND_PROMPT_SENT'){
-          // Successful prompt, now wait for webhook confirmation
-          resetPaymentForm();
-          showMessage(`Success! A Mobile Money prompt has been sent to ${phone}. Please enter your PIN on your phone to complete the payment of GHS ${amountInput.value}.`,'success');
-          // Add optional polling here if needed, but the webhook is the primary source of truth
+          // Successful prompt, now enter Polling state
+          
+          // Start the polling loop. The pollPaymentStatus function will handle displaying the spinner
+          pollPaymentStatus(currentOrderId || data.orderId, phone, amountFormatted);
           return;
         }
 
@@ -337,23 +408,23 @@
         console.error('Payment error:',err);
         const msg=err.message||'Unknown error occurred.';
         
+        dismissOverlay();
+
         if(msg.includes('OTP_FAILED')||msg.includes('TP14')){
-          // Handle failed OTP submission
           showMessage('Verification Failed. The OTP was incorrect or expired. Please try again.','error');
-          // Re-enable OTP input for another try
           toggleFormLock(true); 
           otpInput.readOnly=false; 
           payBtn.disabled=false; 
           payBtn.textContent='Verify & Pay';
         } else if (msg.includes('Moolre API request failed')) {
-          // Handle initial API errors
            showMessage('Payment failed due to an API error. Please check your phone number and network and try again.','error');
            resetPaymentForm();
         } else {
-          // Handle other errors
           showMessage('Error: '+msg,'error'); 
           resetPaymentForm();
         }
+        payBtn.disabled = false;
+        clearBtn.disabled = false;
       }
     });
 
