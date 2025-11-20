@@ -24,7 +24,7 @@ const PORT = process.env.PORT || 3000;
 const MOOLRE_BASE = process.env.MOOLRE_BASE || 'https://api.moolre.com';
 const MOOLRE_PUBLIC_API_KEY = process.env.MOOLRE_PUBLIC_API_KEY || '';
 const MOOLRE_USERNAME = process.env.MOOLRE_USERNAME || '';
-const MOOLRE_SECRET = process.env.MOOLRE_SECRET || ''; // NOW CONTAINS: f8cbc65e-dfea-4752-b1bf-599baab29c1a
+const MOOLRE_SECRET = process.env.MOOLRE_SECRET || ''; // Ensure this is set to the correct UUID: f8cbc65e-dfea-4752-b1bf-599baab29c1a
 const MOOLRE_ACCOUNT_NUMBER = process.env.MOOLRE_ACCOUNT_NUMBER || '';
 const FINAL_REDIRECT_URL = 'https://ovaldataafrica.glide.page/';
 
@@ -186,7 +186,6 @@ app.post('/api/momo-payment', async (req, res) => {
     if (!otpcode) {
       if (responseCode === 'TP14') {
         // Store sessionid AND all original request metadata for OTP verification and webhook use
-        // This is the CRITICAL change: storing metadata for later retrieval by the webhook
         pendingTransactions.set(orderId, { ...req.body, sessionid: moolreData.sessionid || '' }); 
         console.log(`Payment started for ${orderId}. Awaiting OTP. Metadata stored.`);
         return res.json({ success: true, orderId: orderId, status: 'OTP_REQUIRED', message: moolreData.message });
@@ -215,9 +214,9 @@ app.post('/api/momo-payment', async (req, res) => {
 
       const otpData = otpResponse.data;
       if (otpData.status === 1) {
-        pendingTransactions.delete(orderId);
+        // ❌ REMOVED: pendingTransactions.delete(orderId); 
+        // We now leave the metadata for the webhook to use!
         console.log(`Payment verified for ${orderId}. Final MoMo prompt sent.`);
-        // The webhook will handle the final status (success/failure)
         return res.json({ success: true, orderId: orderId, status: 'VERIFIED_AND_PROMPT_SENT', message: otpData.message });
       } else {
         console.log(`OTP verification failed for ${orderId}. Code: ${otpData.code}`);
@@ -272,8 +271,7 @@ app.post('/api/webhook/moolre', async (req, res) => {
     const data = payload.data || {};
     const incomingSecret = data.secret || payload.secret || '';
 
-    // 🔒 SECURITY CHECK REINSTATED
-    // Now that MOOLRE_SECRET is correct, this check will pass.
+    // 🔒 SECURITY CHECK REINSTATED (Will pass now that Render ENV is updated)
     if (incomingSecret !== MOOLRE_SECRET) {
       console.warn('Invalid webhook secret');
       return res.status(401).json({ error: 'Invalid secret' });
@@ -293,13 +291,12 @@ app.post('/api/webhook/moolre', async (req, res) => {
     let recipient = 'N/A - Check Airtable/DB';
     let email = 'N/A - Check Airtable/DB';
 
-    // Retrieve metadata stored during the initial /momo-payment call (Step 1)
+    // 🔑 DATA RETRIEVAL: Metadata is retrieved from the map *here* (it was not deleted earlier)
     const tempTransaction = pendingTransactions.get(externalref);
     if (tempTransaction) {
       dataPlanWithDelivery = tempTransaction.dataPlan || dataPlanWithDelivery;
       recipient = tempTransaction.recipient || recipient;
       email = tempTransaction.email || email;
-      // Note: We don't delete from pendingTransactions here. OTP success deletes it in /momo-payment.
     }
 
     const isExpress = dataPlanWithDelivery.toLowerCase().includes('(express)');
@@ -343,6 +340,10 @@ app.post('/api/webhook/moolre', async (req, res) => {
 
       await airtableCreate(fields);
       confirmedTransactions.set(externalref, true); // <-- Mark as confirmed for polling
+      
+      // 🔥 NEW FIX: Delete the data *after* it has been successfully used/stored
+      pendingTransactions.delete(externalref); 
+
       console.log(`✅ Airtable Record created and SMS sent for Order ID: ${externalref}`);
       
       // Return 200 OK to Moolre to acknowledge successful processing
