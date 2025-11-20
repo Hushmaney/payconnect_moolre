@@ -6,151 +6,51 @@
   <title>PAYCONNECT — Checkout</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    :root{
-      --bg:#f6f7fb;
-      --card:#ffffff;
-      --accent:#0b74ff;
-      --muted:#6b7280;
-      --success:#065f46;
-      --danger:#7f1d1d;
-      --radius:10px;
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --accent: #0b74ff;
+      --muted: #6b7280;
+      --success: #065f46;
+      --danger: #7f1d1d;
+      --radius: 10px;
       --shadow: 0 8px 24px rgba(10,20,40,0.06);
-      --maxwidth:720px;
+      --maxwidth: 720px;
     }
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-      background:var(--bg);
-      padding:28px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      min-height:100vh;
-    }
-    .card{
-      width:100%;
-      max-width:var(--maxwidth);
-      background:var(--card);
-      border-radius:var(--radius);
-      box-shadow:var(--shadow);
-      padding:22px;
-      position:relative;
-    }
-    /* MODIFIED: H1 font size increased AGAIN for maximum visibility */
-    h1{
-      margin:0 0 10px 0;
-      color:var(--accent);
-      font-size: 36px; /* Increased from 28px */
-      text-align:center;
-      letter-spacing:0.2px;
-    }
-    form{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;}
-    label{
-      display:block;
-      font-weight:600;
-      font-size:13px;
-      margin-bottom:6px;
-      color:#111827;
-    }
-    .full{grid-column:1 / -1}
-    input[type="text"],
-    input[type="email"],
-    input[type="tel"],
-    select{
-      width:100%;
-      padding:11px 12px;
-      border-radius:8px;
-      border:1px solid #e6e9ef;
-      background:white;
-      font-size:15px;
-      outline:none;
-    }
-    input[readonly]{background:#f3f4f6;color:#111827;}
-    .muted{color:var(--muted);font-size:13px;text-align:center;margin-top:6px;grid-column:1 / -1;}
-    .actions{grid-column:1 / -1; display:flex; gap:12px; margin-top:6px;}
-    button{
-      flex:1;
-      padding:12px 14px;
-      border-radius:9px;
-      border:none;
-      font-weight:700;
-      font-size:15px;
-      cursor:pointer;
-      transition: background-color 0.2s, opacity 0.2s;
-    }
-    /* Pay button styles (already made bigger in previous step) */
-    .btn-pay{
-      background:var(--accent);
-      color:white;
-      padding: 14px 14px; 
-      font-size: 17px; 
-    }
-    .btn-pay:hover:not([disabled]){background:#0963d3;}
-    .btn-pay[disabled]{opacity:0.6;cursor:not-allowed}
-    .btn-clear{background:transparent;border:1px solid #e6e9ef;color:#111827;}
-    .btn-clear:hover{background:#f3f4f6;}
-    #message{grid-column:1 / -1; margin-top:14px}
-    .msg{
-      padding:12px;
-      border-radius:8px;
-      font-weight:600;
-      text-align:center;
-    }
-    .msg.success{background:#ecfdf5;color:var(--success);border:1px solid #bbf0d0}
-    .msg.error{background:#fff1f2;color:var(--danger);border:1px solid #f7c2c6}
-    .msg.info{background:#eff6ff;color:#1e3a8a;border:1px solid #dbeafe}
-    @media (max-width:640px){
-      form{grid-template-columns:1fr;gap:10px}
-      .actions{flex-direction:column}
-      .btn-pay{padding: 16px 14px; font-size: 18px;} 
-    }
-    input:focus,select:focus{box-shadow:0 4px 12px rgba(11,116,255,0.08);border-color:var(--accent)}
-    .small{font-size:13px;color:var(--muted)}
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background: var(--bg); padding: 28px; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .card { width: 100%; max-width: var(--maxwidth); background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px; position: relative; }
+    h1 { margin: 0 0 10px 0; color: var(--accent); font-size: 36px; text-align: center; letter-spacing: 0.2px; }
+    form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+    label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 6px; color: #111827; }
+    .full { grid-column: 1 / -1; }
+    input[type="text"], input[type="email"], input[type="tel"], select { width: 100%; padding: 11px 12px; border-radius: 8px; border: 1px solid #e6e9ef; background: white; font-size: 15px; outline: none; }
+    input[readonly] { background: #f3f4f6; color: #111827; }
+    .muted { color: var(--muted); font-size: 13px; text-align: center; margin-top: 6px; grid-column: 1 / -1; }
+    .actions { grid-column: 1 / -1; display: flex; gap: 12px; margin-top: 6px; }
+    button { flex: 1; padding: 12px 14px; border-radius: 9px; border: none; font-weight: 700; font-size: 15px; cursor: pointer; transition: background-color 0.2s, opacity 0.2s; }
+    .btn-pay { background: var(--accent); color: white; padding: 14px 14px; font-size: 17px; }
+    .btn-pay:hover:not([disabled]) { background: #0963d3; }
+    .btn-pay[disabled] { opacity: 0.6; cursor: not-allowed; }
+    .btn-clear { background: transparent; border: 1px solid #e6e9ef; color: #111827; }
+    .btn-clear:hover { background: #f3f4f6; }
+    #message { grid-column: 1 / -1; margin-top: 14px; }
+    .msg { padding: 12px; border-radius: 8px; font-weight: 600; text-align: center; }
+    .msg.success { background: #ecfdf5; color: var(--success); border: 1px solid #bbf0d0; }
+    .msg.error { background: #fff1f2; color: var(--danger); border: 1px solid #f7c2c6; }
+    .msg.info { background: #eff6ff; color: #1e3a8a; border: 1px solid #dbeafe; }
+    @media (max-width:640px) { form { grid-template-columns: 1fr; gap: 10px; } .actions { flex-direction: column; } .btn-pay { padding: 16px 14px; font-size: 18px; } }
+    input:focus, select:focus { box-shadow: 0 4px 12px rgba(11,116,255,0.08); border-color: var(--accent); }
+    .small { font-size: 13px; color: var(--muted); }
 
-    /* NEW STYLES FROM CODE BLOCK 2 FOR OVERLAY */
-    body.lock-scroll {
-        overflow: hidden;
-    }
-    #fullScreenOverlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(255, 255, 255, 0.95);
-        display: none;
-        z-index: 1000;
-        align-items: center;
-        justify-content: center;
-        opacity: 0; 
-        transition: opacity 0.3s;
-    }
-    #overlayMessageContent {
-        background: #eff6ff;
-        color: #1e3a8a;
-        padding: 30px 40px;
-        border-radius: 12px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-        max-width: 80%;
-        text-align: center;
-        font-size: 18px;
-        font-weight: 600;
-        line-height: 1.5;
-    }
-    .spinner {
-        border: 4px solid rgba(11, 116, 255, 0.2);
-        border-top: 4px solid #0b74ff;
-        border-radius: 50%;
-        width: 25px;
-        height: 25px;
-        animation: spin 1s linear infinite;
-        margin: 0 auto 15px auto;
-    }
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
+    #otpSection { grid-column: 1 / -1; border-top: 1px solid #e6e9ef; padding-top: 15px; margin-top: 5px; display: none; }
+    #otpSection label { margin-bottom: 8px; }
+
+    body.lock-scroll { overflow: hidden; }
+    #fullScreenOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); display: none; z-index: 1000; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; }
+    #overlayMessageContent { background: #eff6ff; color: #1e3a8a; padding: 30px 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 80%; text-align: center; font-size: 18px; font-weight: 600; line-height: 1.5; }
+    .spinner { border: 4px solid rgba(11,116,255,0.2); border-top: 4px solid #0b74ff; border-radius: 50%; width: 25px; height: 25px; animation: spin 1s linear infinite; margin: 0 auto 15px auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -192,7 +92,7 @@
           <option value="AIRTELTIGO">AirtelTigo</option>
         </select>
       </div>
-      
+
       <div>
         <label for="delivery">Delivery Type</label>
         <select id="delivery" required>
@@ -212,10 +112,13 @@
         <label for="amount">Amount (GHS)</label>
         <input id="amount" type="text" readonly placeholder="0.00" />
       </div>
-
-      <div class="muted full small">
-        After clicking <strong>Pay</strong>, you'll be redirected to a secure Moolre payment page.
-        Once payment is confirmed, you'll receive an SMS and your order will appear as Pending on our dashboard.
+      
+      <div id="otpSection" class="full">
+        <label for="otpcode">Enter OTP (6-digit code sent via SMS to the payer's number)</label>
+        <input id="otpcode" type="text" inputmode="numeric" placeholder="Enter 6-digit OTP" pattern="[0-9]{6}" maxlength="6" />
+      </div>
+      <div class="muted full small" id="paymentInstruction">
+        After clicking **Pay**, we will send an OTP to your phone to confirm the MoMo number.
       </div>
 
       <div class="actions full">
@@ -233,326 +136,228 @@
 
   <script>
     const BACKEND_URL = "https://payconnect-moolre-backend.onrender.com";
+    const PAYMENT_ENDPOINT = `${BACKEND_URL}/api/momo-payment`;
 
-    // Re-using the PLAN structure from Code Block 1
+    let currentOrderId = null;
+
     const PLANS = {
-      MTN: [
-          ["1GB", 1.00, 1.00], 
-          ["2GB", 11.00, 13.00],
-          ["3GB", 15.50, 17.00],
-          ["4GB", 21.00, 23.00],
-          ["5GB", 25.00, 27.00],
-          ["6GB", 32.00, 35.00],
-          ["8GB", 40.00, 42.00],
-          ["10GB", 50.00, 52.00],
-          ["15GB", 72.00, 74.00],
-          ["20GB", 87.00, 89.00],
-          ["25GB", 110.00, 112.00],
-          ["30GB", 135.00, 137.00],
-          ["40GB", 175.00, 177.00],
-          ["50GB", 210.00, 212.00],
-          ["100GB", 405.00, 407.00]
-      ],
-      TELECEL: [
-          ["5GB", 24.00, 27.00],
-          ["10GB", 44.00, 47.00],
-          ["15GB", 63.00, 65.00],
-          ["20GB", 83.00, 85.00],
-          ["25GB", 101.00, 103.00],
-          ["30GB", 121.00, 122.00],
-          ["35GB", 150.00, 152.00],
-          ["40GB", 161.00, 163.00],
-          ["45GB", 190.00, 192.00],
-          ["50GB", 202.00, 204.00],
-          ["100GB", 375.00, 377.00],
-      ],
-      AIRTELTIGO: [
-          ["1GB", 4.50, 5.00],
-          ["2GB", 8.50, 9.50],
-          ["3GB", 13.00, 14.00],
-          ["4GB", 17.00, 18.00],
-          ["5GB", 23.00, 24.00],
-          ["6GB", 28.00, 29.00],
-          ["7GB", 32.00, 33.00],
-          ["8GB", 41.00, 42.00],
-          ["10GB", 47.00, 48.00],
-          ["12GB", 55.00, 56.00],
-          ["15GB", 72.00, 73.00],
-          ["20GB", 82.00, 83.00],
-          ["25GB", 98.00, 99.00],
-          ["30GB", 128.00, 129.00],
-          ["40GB", 175.00, 176.00],
-          ["50GB", 230.00, 231.00],
-          ["100GB", 440.00, 441.00],
-      ]
+      MTN: [["1GB",1,1],["2GB",11,13],["3GB",15.5,17],["4GB",21,23],["5GB",25,27],["6GB",32,35],["8GB",40,42],["10GB",50,52],["15GB",72,74],["20GB",87,89],["25GB",110,112],["30GB",135,137],["40GB",175,177],["50GB",210,212],["100GB",405,407]],
+      TELECEL: [["5GB",24,27],["10GB",44,47],["15GB",63,65],["20GB",83,85],["25GB",101,103],["30GB",121,122],["35GB",150,152],["40GB",161,163],["45GB",190,192],["50GB",202,204],["100GB",375,377]],
+      AIRTELTIGO: [["1GB",4.5,5],["2GB",8.5,9.5],["3GB",13,14],["4GB",17,18],["5GB",23,24],["6GB",28,29],["7GB",32,33],["8GB",41,42],["10GB",47,48],["12GB",55,56],["15GB",72,73],["20GB",82,83],["25GB",98,99],["30GB",128,129],["40GB",175,176],["50GB",230,231],["100GB",440,441]]
     };
 
-    // Get references to all form fields and the button
-    const emailInput = document.getElementById('email');
-    const phoneInput = document.getElementById('phone');
-    const recipientInput = document.getElementById('recipient');
-    const payerNetworkSel = document.getElementById('payerNetwork'); 
-    const recipientNetworkSel = document.getElementById('recipientNetwork'); 
-    const deliverySel = document.getElementById('delivery'); // Delivery Type SELECT is now used
-    const planSel = document.getElementById('dataplan');
-    const amountInput = document.getElementById('amount');
-    const payBtn = document.getElementById('payBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const messageDiv = document.getElementById('message');
-    // Get overlay elements
-    const overlay = document.getElementById("fullScreenOverlay");
-    const overlayContent = document.getElementById("overlayMessageContent");
+    const emailInput=document.getElementById('email');
+    const phoneInput=document.getElementById('phone');
+    const recipientInput=document.getElementById('recipient');
+    const payerNetworkSel=document.getElementById('payerNetwork');
+    const recipientNetworkSel=document.getElementById('recipientNetwork');
+    const deliverySel=document.getElementById('delivery');
+    const planSel=document.getElementById('dataplan');
+    const amountInput=document.getElementById('amount');
+    const payBtn=document.getElementById('payBtn');
+    const clearBtn=document.getElementById('clearBtn');
+    const messageDiv=document.getElementById('message');
+    const overlay=document.getElementById("fullScreenOverlay");
+    const overlayContent=document.getElementById("overlayMessageContent");
+    const otpSection=document.getElementById('otpSection');
+    const otpInput=document.getElementById('otpcode');
+    const paymentInstruction=document.getElementById('paymentInstruction');
 
-
-    function formatPrice(p){ return Number(p).toFixed(2); }
-
-    // MODIFIED showMessage to use the full-screen overlay for 'info'
-    function showMessage(text, type = 'info') {
-      const m = document.getElementById("message");
-      
-      if (type === "info") {
-          // Display message in the full-screen overlay
-          overlayContent.innerHTML = `
-              <div class="spinner"></div>
-              ${text}
-          `;
-          overlay.style.display = 'flex';
-          setTimeout(() => {
-              overlay.style.opacity = '1';
-              document.body.classList.add('lock-scroll');
-          }, 10);
-          m.innerHTML = "";
-
-      } else {
-          // Display error/success message in the standard card location
-          m.innerHTML = "";
-          const div = document.createElement("div");
-          div.textContent = text;
-          div.className = `msg ${type}`; // Use existing CSS for success/error
-          m.appendChild(div);
-          
-          // Hide overlay
-          overlay.style.opacity = '0';
-          document.body.classList.remove('lock-scroll');
-          setTimeout(() => {
-              overlay.style.display = 'none';
-          }, 300);
-      }
-    }
-
-    function clearMessage() { 
-      messageDiv.innerHTML = ''; 
-      // Also clear overlay if visible
-      overlay.style.opacity = '0';
+    function formatPrice(p){return Number(p).toFixed(2);}
+    function dismissOverlay(){
+      overlay.style.opacity='0';
       document.body.classList.remove('lock-scroll');
-      setTimeout(() => {
-          overlay.style.display = 'none';
-      }, 300);
+      setTimeout(()=>{overlay.style.display='none';},300);
     }
     
-    // FUNCTION: Locks and unlocks the entire form
-    function toggleFormLock(isLocking) {
-        emailInput.readOnly = isLocking;
-        phoneInput.readOnly = isLocking; 
-        recipientInput.readOnly = isLocking; 
-        
-        payerNetworkSel.disabled = isLocking;
-        recipientNetworkSel.disabled = isLocking;
-        deliverySel.disabled = isLocking;
-        planSel.disabled = isLocking;
-
-        payBtn.disabled = isLocking;
-    }
-
-    // FUNCTION: Auto-detect network based on number input
-    function autoDetectNetwork(number, targetSelect) {
-        const trimmedNumber = number.trim();
-        let detectedNetwork = '';
-
-        if (trimmedNumber.length >= 3) {
-            const prefix = trimmedNumber.substring(0, 3);
-            
-            // MTN Prefixes: 024, 025, 053, 054, 055, 059
-            if (['024', '025', '053', '054', '055', '059'].includes(prefix)) {
-                detectedNetwork = 'MTN';
-            // Telecel Prefixes: 020, 050
-            } else if (['020', '050'].includes(prefix)) {
-                detectedNetwork = 'TELECEL';
-            // AirtelTigo Prefixes: 026, 027, 056, 057
-            } else if (['026', '027', '056', '057'].includes(prefix)) {
-                detectedNetwork = 'AIRTELTIGO';
-            }
-        }
-        
-        targetSelect.value = detectedNetwork;
-        
-        // If recipient network changed, update the plans dropdown
-        if (targetSelect === recipientNetworkSel) {
-            populatePlansForNetwork(detectedNetwork);
-        }
-    }
-    
-    // MODIFIED: Populates plan options, showing the delivery price and type in the option text
-    function populatePlansForNetwork(network){
-      planSel.innerHTML = '';
-      amountInput.value = '';
-      const deliveryName = deliverySel.value; // "Normal" or "Express"
-      
-      if(!network || !PLANS[network]){
-        planSel.innerHTML = '<option value="">Select recipient network first</option>';
-        planSel.disabled = true;
-        return;
+    function showMessage(text,type='info'){
+      messageDiv.innerHTML=''; // Always clear inline message when starting a new message
+      if(type==='info'){
+        // Use the overlay for 'info' and processing states
+        overlayContent.innerHTML=`<div class="spinner"></div>${text}`;
+        overlay.style.display='flex';
+        // Use a slight timeout to ensure display:flex is applied before setting opacity
+        setTimeout(() => {
+          overlay.style.opacity='1';
+          document.body.classList.add('lock-scroll');
+        }, 10);
+      }else{
+        // Use the inline div for success/error
+        dismissOverlay();
+        const div=document.createElement('div'); div.textContent=text; div.className=`msg ${type}`;
+        messageDiv.appendChild(div);
       }
-      planSel.disabled = false;
-      let opt = document.createElement('option');
-      opt.value = ''; opt.textContent = 'Select Data Plan';
-      planSel.appendChild(opt);
+    }
+    function clearMessage(){ dismissOverlay(); messageDiv.innerHTML='';}
 
-      // Determine which price index to use: 1 for Normal, 2 for Express
-      const priceIndex = deliveryName === "Express" ? 2 : 1; 
+    function toggleFormLock(isLocking){
+      emailInput.readOnly=isLocking; phoneInput.readOnly=isLocking; recipientInput.readOnly=isLocking;
+      payerNetworkSel.disabled=isLocking; recipientNetworkSel.disabled=isLocking;
+      deliverySel.disabled=isLocking; planSel.disabled=isLocking; payBtn.disabled=isLocking; clearBtn.disabled=isLocking;
+      // Ensure OTP input and button are handled separately during the OTP phase
+      if (!isLocking) {
+        otpInput.readOnly = false;
+        payBtn.disabled = false;
+      }
+    }
+    
+    function resetPaymentForm(){ 
+      currentOrderId=null; 
+      otpInput.value=''; 
+      otpSection.style.display='none'; 
+      otpInput.removeAttribute('required'); // Remove required attribute when hidden
+      payBtn.textContent='Pay'; 
+      paymentInstruction.innerHTML='After clicking **Pay**, we will send an OTP to your phone to confirm the MoMo number.'; 
+      toggleFormLock(false); 
+      clearMessage();
+    }
 
-      PLANS[network].forEach(plan=>{
-        const [name, normal, express] = plan;
-        const price = plan[priceIndex]; // Get the currently selected price
-        
-        const option = document.createElement('option');
-        // Store name, normal, and express prices for easy lookup in updateAmountFromPlan
-        option.value = JSON.stringify({
-            name:`${network} ${name}`, 
-            normal, 
-            express
-            // The deliveryType is NOT stored here anymore, it's read from deliverySel on submit
-        });
-        // Display the plan name and the merged price/delivery type
-        option.textContent = `${name} — GHS ${formatPrice(price)} (${deliveryName})`;
-        planSel.appendChild(option);
+    function autoDetectNetwork(number,targetSelect){
+      const trimmed=(number||'').trim(); let detected='';
+      if(trimmed.length>=3){ const prefix=trimmed.substring(0,3);
+        if(['024','025','053','054','055','059'].some(p=>trimmed.startsWith(p))) detected='MTN';
+        else if(['020','050'].some(p=>trimmed.startsWith(p))) detected='TELECEL';
+        else if(['026','027','056','057'].some(p=>trimmed.startsWith(p))) detected='AIRTELTIGO';
+      }
+      targetSelect.value=detected;
+      if(targetSelect===recipientNetworkSel) populatePlansForNetwork(detected);
+    }
+
+    function populatePlansForNetwork(network){
+      planSel.innerHTML=''; amountInput.value='';
+      const deliveryName=deliverySel.value;
+      if(!network||!PLANS[network]){ planSel.innerHTML='<option value="">Select recipient network first</option>'; planSel.disabled=true; return; }
+      planSel.disabled=false;
+      const first=document.createElement('option'); first.value=''; first.textContent='Select Data Plan'; planSel.appendChild(first);
+      const priceIndex=deliveryName==='Express'?2:1;
+      PLANS[network].forEach(([name,normal,express])=>{
+        const price=priceIndex===2?express:normal;
+        const opt=document.createElement('option');
+        // Store the full plan details as a JSON string
+        opt.value=JSON.stringify({name:`${network} ${name}`, normal, express});
+        opt.textContent=`${name} — GHS ${formatPrice(price)} (${deliveryName})`;
+        planSel.appendChild(opt);
       });
       updateAmountFromPlan();
     }
-    
-    // Logic remains the same, calculates price based on deliverySel value
-    function updateAmountFromPlan(){
-      try{
-        const val = planSel.value;
-        if(!val){ amountInput.value=''; return; }
-        const parsed = JSON.parse(val);
-        // Uses the selected delivery option to choose the price
-        const price = deliverySel.value === 'Express' ? parsed.express : parsed.normal;
-        amountInput.value = formatPrice(price);
-      }catch{ amountInput.value=''; }
-    }
+    function updateAmountFromPlan(){ try{ const val=planSel.value; if(!val){ amountInput.value=''; return; } const parsed=JSON.parse(val); const price=deliverySel.value==='Express'?parsed.express:parsed.normal; amountInput.value=formatPrice(price); }catch(err){ amountInput.value=''; } }
 
-    // --- EVENT LISTENERS ---
+    phoneInput.addEventListener('input',()=>{autoDetectNetwork(phoneInput.value,payerNetworkSel); clearMessage();});
+    recipientInput.addEventListener('input',()=>{autoDetectNetwork(recipientInput.value,recipientNetworkSel); clearMessage();});
+    recipientNetworkSel.addEventListener('change',(e)=>{populatePlansForNetwork(e.target.value); clearMessage();});
+    deliverySel.addEventListener('change',()=>{populatePlansForNetwork(recipientNetworkSel.value); clearMessage();});
+    planSel.addEventListener('change',()=>{updateAmountFromPlan(); clearMessage();});
 
-    // Payer Phone: auto-detect Payer's network
-    phoneInput.addEventListener("input", () => autoDetectNetwork(phoneInput.value, payerNetworkSel)); 
-    
-    // Recipient Phone: auto-detect Recipient network
-    recipientInput.addEventListener("input", () => {
-        autoDetectNetwork(recipientInput.value, recipientNetworkSel);
-    });
-
-    // Recipient Network change: populate plans based on the selected network
-    recipientNetworkSel.addEventListener('change', e => { 
-      populatePlansForNetwork(e.target.value); 
-      clearMessage(); 
-    });
-    
-    // Delivery change: re-populate plans (to update display price) and recalculate amount
-    deliverySel.addEventListener('change', ()=>{ 
-      // Repopulating updates the price shown in the Data Plan dropdown options
-      populatePlansForNetwork(recipientNetworkSel.value);
-      clearMessage(); 
-    });
-
-    planSel.addEventListener('change', ()=>{ updateAmountFromPlan(); clearMessage(); });
-    
-
-    clearBtn.addEventListener('click', ()=>{
+    clearBtn.addEventListener('click',()=>{
       document.getElementById('checkoutForm').reset();
-      // Reset plan dropdown to initial state
-      planSel.innerHTML = '<option value="">Select a network first</option>';
-      planSel.disabled = true;
-      amountInput.value = '';
-      clearMessage();
+      planSel.innerHTML='<option value="">Select a network first</option>';
+      planSel.disabled=true;
+      amountInput.value='';
+      resetPaymentForm();
     });
 
-    // --- SUBMIT HANDLER (MODIFIED TO MERGE DATAPLAN AND DELIVERY) ---
+    document.getElementById('checkoutForm').addEventListener('submit', async(e)=>{
+      e.preventDefault();
+      const email=emailInput.value.trim();
+      const phone=phoneInput.value.trim();
+      const recipient=recipientInput.value.trim();
+      const recipientNetwork=recipientNetworkSel.value;
+      const payerNetwork=payerNetworkSel.value;
+      const planVal=planSel.value;
+      const otpcode=otpInput.value.trim();
 
-    document.getElementById('checkoutForm').addEventListener('submit', async e => {
-      e.preventDefault(); clearMessage();
-      
-      const email = emailInput.value.trim();
-      const phone = phoneInput.value.trim();
-      const recipient = recipientInput.value.trim();
-      const recipientNetwork = recipientNetworkSel.value; 
-      const payerNetwork = payerNetworkSel.value; 
-      const planVal = planSel.value;
+      if(!phone||!recipient||!recipientNetwork||!payerNetwork||!planVal) return showMessage('All required fields must be filled.','error');
 
-      if(!phone || !recipient || !recipientNetwork || !payerNetwork || !planVal) {
-        return showMessage('All required fields must be filled.','error');
-      }
+      let planData; try{ planData=JSON.parse(planVal);}catch(err){return showMessage('Invalid data plan selected.','error');}
+      const deliveryType=deliverySel.value;
+      const amount=deliveryType==='Express'?planData.express:planData.normal;
+      // This is the formatted string used in the SMS and Airtable
+      const mergedDataPlan=`${planData.name} (${deliveryType})`;
 
-      const planData = JSON.parse(planVal);
-      // Get the selected delivery type from the visible select field
-      const deliveryType = deliverySel.value; // "Normal" or "Express"
-      
-      // Recalculate final amount based on the selected delivery type
-      const amount = deliveryType === 'Express' ? planData.express : planData.normal; 
-      
-      // *** THE CRITICAL CHANGE: Merge Data Plan Name and Delivery Type ***
-      const mergedDataPlan = `${planData.name} (${deliveryType})`;
-
-      const payload = { 
+      const payload={
         email, 
         phone, 
         recipient, 
-        dataPlan: mergedDataPlan, // Send merged string to backend
-        amount: Number(amount),
-        // The separate 'delivery' field is omitted, fulfilling your request 
-        // that Airtable only uses the 'Data Plan' field.
+        dataPlan:mergedDataPlan, 
+        amount:Number(amount), 
+        externalref:currentOrderId, 
+        otpcode
       };
 
-      // NEW UX: Lock the form and show overlay
+      let isInitialRequest=!currentOrderId && otpcode==='';
+
+      if(!isInitialRequest && currentOrderId && otpcode.length!==6) return showMessage('Please enter the 6-digit OTP received via SMS.','error');
+
+      // Lock all fields except OTP input during the OTP stage
       toggleFormLock(true);
-      showMessage('Processing payment request. Please check your phone for the MoMo prompt, do not close tab/window.','info');
+      
+      if(isInitialRequest){ 
+        showMessage('Requesting Mobile Money Payment. Please wait for an SMS OTP...','info'); 
+      }
+      else{ 
+        otpInput.readOnly=true; 
+        payBtn.textContent='Verifying...'; 
+        showMessage('Verifying OTP and sending final MoMo prompt...','info'); 
+      }
 
       try{
-        const res = await fetch(BACKEND_URL + '/api/start-checkout', {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify(payload)
-        });
-        const data = await res.json();
-        
-        if(!res.ok) {
-          throw new Error(data.error || 'Failed to start payment.');
+        const res=await fetch(PAYMENT_ENDPOINT,{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+        const data=await res.json().catch(()=>({}));
+
+        if(!res.ok||data.success===false) throw new Error(data.message||data.error||`Server returned ${res.status}`);
+
+        if(data.status==='OTP_REQUIRED'){
+          currentOrderId=data.orderId;
+          clearMessage();
+          // Unlock only the OTP related fields
+          toggleFormLock(true); 
+          otpSection.style.display='grid';
+          otpInput.setAttribute('required', 'required'); // Add required attribute for validation
+          otpInput.readOnly=false;
+          payBtn.disabled=false;
+          payBtn.textContent='Verify & Pay';
+          paymentInstruction.innerHTML='Enter the **6-digit OTP** sent to your phone to verify the number and initiate the MoMo prompt.';
+          showMessage(data.message || 'OTP has been sent to your phone. Please enter it below to proceed.','info');
+          otpInput.focus();
+          return;
         }
 
-        const link = data?.paymentLink; 
+        if(data.status==='PROMPT_SENT'||data.status==='VERIFIED_AND_PROMPT_SENT'){
+          // Successful prompt, now wait for webhook confirmation
+          resetPaymentForm();
+          showMessage(`Success! A Mobile Money prompt has been sent to ${phone}. Please enter your PIN on your phone to complete the payment of GHS ${amountInput.value}.`,'success');
+          // Add optional polling here if needed, but the webhook is the primary source of truth
+          return;
+        }
 
-        if(link){ 
-          showMessage('Redirecting to Moolre for Payment...','info'); 
-          setTimeout(()=>{
-            toggleFormLock(false); 
-            window.location.href=link;
-          },1000); 
-        }
-        else {
-          console.error('No payment link:', data);
-          showMessage('Payment link missing. Check backend logs.','error');
-          toggleFormLock(false);
-        }
+        // Catch-all for unexpected success status
+        showMessage(data.message || 'Payment process started. Please check your phone for prompts.','info');
+        resetPaymentForm();
       }catch(err){
-        console.error('Checkout error:', err); 
-        showMessage('Error: '+err.message,'error');
-        toggleFormLock(false);
+        console.error('Payment error:',err);
+        const msg=err.message||'Unknown error occurred.';
+        
+        if(msg.includes('OTP_FAILED')||msg.includes('TP14')){
+          // Handle failed OTP submission
+          showMessage('Verification Failed. The OTP was incorrect or expired. Please try again.','error');
+          // Re-enable OTP input for another try
+          toggleFormLock(true); 
+          otpInput.readOnly=false; 
+          payBtn.disabled=false; 
+          payBtn.textContent='Verify & Pay';
+        } else if (msg.includes('Moolre API request failed')) {
+          // Handle initial API errors
+           showMessage('Payment failed due to an API error. Please check your phone number and network and try again.','error');
+           resetPaymentForm();
+        } else {
+          // Handle other errors
+          showMessage('Error: '+msg,'error'); 
+          resetPaymentForm();
+        }
       }
     });
 
-    (function init(){ 
-      populatePlansForNetwork(recipientNetworkSel.value);
-    })();
+    (function init(){ populatePlansForNetwork(recipientNetworkSel.value); })();
   </script>
 </body>
 </html>
