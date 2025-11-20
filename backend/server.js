@@ -24,7 +24,7 @@ const PORT = process.env.PORT || 3000;
 const MOOLRE_BASE = process.env.MOOLRE_BASE || 'https://api.moolre.com';
 const MOOLRE_PUBLIC_API_KEY = process.env.MOOLRE_PUBLIC_API_KEY || '';
 const MOOLRE_USERNAME = process.env.MOOLRE_USERNAME || '';
-const MOOLRE_SECRET = process.env.MOOLRE_SECRET || '';
+const MOOLRE_SECRET = process.env.MOOLRE_SECRET || ''; // NOW CONTAINS: f8cbc65e-dfea-4752-b1bf-599baab29c1a
 const MOOLRE_ACCOUNT_NUMBER = process.env.MOOLRE_ACCOUNT_NUMBER || '';
 const FINAL_REDIRECT_URL = 'https://ovaldataafrica.glide.page/';
 
@@ -272,20 +272,12 @@ app.post('/api/webhook/moolre', async (req, res) => {
     const data = payload.data || {};
     const incomingSecret = data.secret || payload.secret || '';
 
-    // ⚠️ TEMPORARY DEBUGGING: LOG THE SECRET INSTEAD OF FAILING ⚠️
-    // You MUST remove this block after capturing the secret!
+    // 🔒 SECURITY CHECK REINSTATED
+    // Now that MOOLRE_SECRET is correct, this check will pass.
     if (incomingSecret !== MOOLRE_SECRET) {
-      console.warn('⚠️ WEBHOOK SECRET MISMATCH DETECTED!');
-      console.warn('Your Server Secret (MOOLRE_SECRET):', MOOLRE_SECRET);
-      console.warn('Moolre Incoming Secret:', incomingSecret); 
-    } 
-    // END OF DEBUG BLOCK
-
-    // This is the original security check, which we are temporarily bypassing:
-    // if (incomingSecret !== MOOLRE_SECRET) {
-    //   console.warn('Invalid webhook secret');
-    //   return res.status(401).json({ error: 'Invalid secret' });
-    // }
+      console.warn('Invalid webhook secret');
+      return res.status(401).json({ error: 'Invalid secret' });
+    }
 
     const txstatus = Number(data.txstatus || 0);
     const externalref = data.externalref || '';
